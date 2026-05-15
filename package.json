@@ -1,0 +1,57 @@
+{
+  "name": "@atharvdange/toolchain",
+  "version": "1.0.0",
+  "description": "Scaffold ESLint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project",
+  "keywords": [
+    "toolchain",
+    "eslint",
+    "prettier",
+    "husky",
+    "commitlint",
+    "typescript"
+  ],
+  "homepage": "https://github.com/atharvdange618/toolchain",
+  "bugs": "https://github.com/atharvdange618/toolchain/issues",
+  "license": "MIT",
+  "author": "Atharv Dange",
+  "type": "module",
+  "bin": {
+    "toolchain": "./bin/index.js"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.15.3",
+    "@types/prompts": "^2.4.9",
+    "eslint": "^9.39.4",
+    "eslint-plugin-perfectionist": "^5.9.0",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
