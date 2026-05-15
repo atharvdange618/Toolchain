@@ -25,7 +25,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
     framework: detectFramework(pkg),
     hasReact: hasReactDep(pkg),
     isMonorepo: detectMonorepo(pkg),
-    packageManager: detectPackageManager(dir),
+    packageManager: detectPackageManager(dir, pkg),
   };
 }
 
@@ -47,9 +47,15 @@ function detectMonorepo(pkg: Record<string, unknown>): boolean {
   return false;
 }
 
-function detectPackageManager(dir: string): PackageManager {
+function detectPackageManager(dir: string, pkg: Record<string, unknown>): PackageManager {
   if (existsSync(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
   if (existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
+
+  const devEngines = pkg.devEngines as Record<string, unknown> | undefined;
+  const pmConfig = devEngines?.packageManager as Record<string, unknown> | undefined;
+  if (pmConfig?.name === 'pnpm') return 'pnpm';
+  if (pmConfig?.name === 'yarn') return 'yarn';
+
   return 'npm';
 }
 
