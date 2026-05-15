@@ -48,6 +48,10 @@ function detectMonorepo(pkg: Record<string, unknown>): boolean {
 }
 
 function detectPackageManager(dir: string, pkg: Record<string, unknown>): PackageManager {
+  const userAgent = process.env.npm_config_user_agent ?? '';
+  if (userAgent.startsWith('pnpm')) return 'pnpm';
+  if (userAgent.startsWith('yarn')) return 'yarn';
+
   if (existsSync(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
   if (existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
 

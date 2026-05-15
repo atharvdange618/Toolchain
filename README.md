@@ -30,14 +30,13 @@ npx @atharvdange/toolchain init
 
 ```bash
 # Interactive
-npx @atharvdange/toolchain init
+pnpm dlx @atharvdange/toolchain init
 
 # Non-interactive (defaults)
-npx @atharvdange/toolchain init --yes
-
-# Specify package manager
-npx @atharvdange/toolchain init --pm pnpm
+pnpm dlx @atharvdange/toolchain init --yes
 ```
+
+> **Note:** `npx @atharvdange/toolchain init` will **not** work because the package's `packageManager` is set to `pnpm`, causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx` (or `yarn dlx` / `bun x` if you prefer those).
 
 ## ESLint variants
 
