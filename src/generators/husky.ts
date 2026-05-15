@@ -1,20 +1,22 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-export function writeHuskyHooks(targetDir: string, pm: string): void {
+import { pmExec, type PackageManager } from '../detectors/project.js';
+
+export function writeHuskyHooks(targetDir: string, pm: PackageManager): void {
   const huskyDir = path.join(targetDir, '.husky');
   mkdirSync(huskyDir, { recursive: true });
 
   writeFileSync(
     path.join(huskyDir, 'pre-commit'),
-    `${pm} exec lint-staged
+    `${pmExec(pm)} lint-staged
 ${pm} run typecheck
 `,
   );
 
   writeFileSync(
     path.join(huskyDir, 'commit-msg'),
-    `${pm} exec commitlint --edit $1
+    `${pmExec(pm)} commitlint --edit $1
 `,
   );
 }

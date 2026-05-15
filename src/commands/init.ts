@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 import prompts from 'prompts';
 
-import { detect, type PackageManager } from '../detectors/project.js';
+import { detect, pmExec, type PackageManager } from '../detectors/project.js';
 import { generateEslintConfig } from '../generators/eslint.js';
 import { writeHuskyHooks } from '../generators/husky.js';
 import { updatePackageJson } from '../generators/package-json.js';
@@ -74,13 +74,13 @@ export async function init(options: { pm?: string; yes?: boolean }): Promise<voi
   success('Dependencies installed');
 
   step(9, 'Initializing Husky...');
-  execSync(`${pm} exec husky`, { cwd: targetDir, stdio: 'inherit' });
+  execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
   success('Husky initialized');
 
   console.log(`\n${'='.repeat(50)}`);
   success('Toolchain is ready!');
   console.log(`\nNext steps:`);
-  console.log(`  1. ${pm === 'npm' ? 'npm run' : `${pm} run`} lint:fix`);
-  console.log(`  2. ${pm === 'npm' ? 'npm run' : `${pm} run`} typecheck`);
+  console.log(`  1. ${pm} run lint:fix`);
+  console.log(`  2. ${pm} run typecheck`);
   console.log(`  3. Make a test commit to verify hooks`);
 }

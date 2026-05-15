@@ -3,7 +3,7 @@
 A reusable CLI that scaffolds a complete dev toolchain - ESLint, Prettier, Husky, commitlint, and strict TypeScript - into any JS/TS project with one command.
 
 ```bash
-npx @atharvdange/toolchain init
+pnpm dlx @atharvdange/toolchain init
 ```
 
 ## Features
@@ -36,7 +36,7 @@ pnpm dlx @atharvdange/toolchain init
 pnpm dlx @atharvdange/toolchain init --yes
 ```
 
-> **Note:** `npx @atharvdange/toolchain init` will **not** work because the package's `packageManager` is set to `pnpm`, causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx` (or `yarn dlx` / `bun x` if you prefer those).
+> **Note:** `npx @atharvdange/toolchain init` will **not** work because the package's `packageManager` is set to `pnpm`, causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx`, `yarn dlx`, or `bunx` instead.
 
 ## ESLint variants
 
@@ -51,6 +51,6 @@ The generated `eslint.config.mjs` adapts based on what's in your `package.json`:
 
 ## Detection logic
 
-- **Package manager**: looks for `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, else npm
+- **Package manager**: checks `npm_config_user_agent` first (set by the package manager that invoked the CLI), then lockfiles (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn), then `devEngines` in package.json, else npm
 - **Monorepo**: checks for `workspaces` in package.json or `pnpm.workspaces`
 - **Framework**: checks `dependencies` / `devDependencies` for `next`, `express`, `react`

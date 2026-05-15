@@ -4,7 +4,11 @@ import path from 'node:path';
 import { readJson } from '../utils/fs.js';
 
 export type Framework = 'express' | 'next' | 'plain' | 'react';
-export type PackageManager = 'npm' | 'pnpm' | 'yarn';
+export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'yarn';
+
+export function pmExec(pm: PackageManager): string {
+  return pm === 'bun' ? 'bun run' : `${pm} exec`;
+}
 
 export interface ProjectInfo {
   framework: Framework;
@@ -51,6 +55,7 @@ function detectPackageManager(dir: string, pkg: Record<string, unknown>): Packag
   const userAgent = process.env.npm_config_user_agent ?? '';
   if (userAgent.startsWith('pnpm')) return 'pnpm';
   if (userAgent.startsWith('yarn')) return 'yarn';
+  if (userAgent.startsWith('bun')) return 'bun';
 
   if (existsSync(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
   if (existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';

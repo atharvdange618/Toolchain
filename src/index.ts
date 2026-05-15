@@ -24,7 +24,7 @@ program
   .command('init')
   .description('Initialize toolchain in the current project')
   .option('--yes', 'Skip prompts and use defaults')
-  .option('--pm <manager>', 'Package manager to use (npm, yarn, pnpm)')
+  .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
   .action(init);
 
 program.parse();
