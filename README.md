@@ -36,7 +36,7 @@ pnpm dlx @atharvdange/toolchain init
 pnpm dlx @atharvdange/toolchain init --yes
 ```
 
-> **Note:** `npx @atharvdange/toolchain init` will **not** work because the package's `packageManager` is set to `pnpm`, causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx`, `yarn dlx`, or `bunx` instead.
+> **Note:** `npx @atharvdange/toolchain init` will **not** work when the package's `packageManager` is set to `pnpm` (if you initialized a blank project with pnpm init), causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx`, `yarn dlx`, or `bunx` instead.
 
 ## ESLint variants
 
