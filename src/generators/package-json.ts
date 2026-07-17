@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { ProjectInfo } from '../detectors/project.js';
 
+import { warn } from '../utils/logger.js';
+
 const SCRIPTS: Record<string, string> = {
   format: 'prettier --write .',
   'format:check': 'prettier --check .',
@@ -35,7 +37,13 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   const pkgPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
 
-  pkg.scripts = { ...(pkg.scripts as Record<string, string>), ...SCRIPTS };
+  const existingScripts = (pkg.scripts as Record<string, string>) ?? {};
+  const conflicts = Object.keys(SCRIPTS).filter((key) => key in existingScripts);
+  if (conflicts.length > 0) {
+    warn(`Overwriting existing scripts: ${conflicts.join(', ')}`);
+  }
+
+  pkg.scripts = preserveKeyOrder(existingScripts, SCRIPTS);
   pkg['lint-staged'] = LINT_STAGED;
 
   const devDeps: Record<string, string> = { ...BASE_DEV_DEPS };
@@ -47,7 +55,19 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
     devDeps['@next/eslint-plugin-next'] = '^16.2.6';
   }
 
-  pkg.devDependencies = { ...(pkg.devDependencies as Record<string, string>), ...devDeps };
+  const existingDeps = (pkg.devDependencies as Record<string, string>) ?? {};
+  pkg.devDependencies = preserveKeyOrder(existingDeps, devDeps);
 
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
+function preserveKeyOrder(original: Record<string, unknown>, merged: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(original)) {
+    result[key] = merged[key];
+  }
+  for (const key of Object.keys(merged)) {
+    if (!(key in result)) result[key] = merged[key];
+  }
+  return result;
 }
