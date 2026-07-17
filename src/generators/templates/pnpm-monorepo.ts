@@ -138,10 +138,10 @@ const PACKAGES_CONFIG_PKG = `{
 }`;
 
 const PACKAGES_CONFIG_INDEX = `export const config = {
-  appName: process.env.APP_NAME ?? 'my-app',
-  nodeEnv: process.env.NODE_ENV ?? 'development',
-  port: Number(process.env.PORT) ?? 3000,
-  databaseUrl: process.env.DATABASE_URL ?? 'postgresql://localhost:5432/mydb',
+  appName: process.env['APP_NAME'] ?? 'my-app',
+  nodeEnv: process.env['NODE_ENV'] ?? 'development',
+  port: Number(process.env['PORT']) ?? 3000,
+  databaseUrl: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/mydb',
 } as const;
 
 export type Config = typeof config;
