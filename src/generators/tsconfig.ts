@@ -3,30 +3,30 @@ export interface TsconfigOptions {
 }
 
 const COMPILER_OPTIONS = {
-  // Strict mode
-  strict: true,
-  noUnusedLocals: true,
-  noUnusedParameters: true,
-  noFallthroughCasesInSwitch: true,
-  noUncheckedIndexedAccess: true,
-
-  // Code quality
-  noImplicitOverride: true,
-  exactOptionalPropertyTypes: true,
-  noPropertyAccessFromIndexSignature: true,
-
   // Module system
   esModuleInterop: true,
+  exactOptionalPropertyTypes: true,
   forceConsistentCasingInFileNames: true,
   module: 'ESNext',
   moduleResolution: 'bundler',
-  verbatimModuleSyntax: true,
+
+  noFallthroughCasesInSwitch: true,
+  // Code quality
+  noImplicitOverride: true,
+  noPropertyAccessFromIndexSignature: true,
+
+  noUncheckedIndexedAccess: true,
+  noUnusedLocals: true,
+  noUnusedParameters: true,
+  // Performance
+  skipLibCheck: true,
+  // Strict mode
+  strict: true,
 
   // Target
   target: 'ES2022',
 
-  // Performance
-  skipLibCheck: true,
+  verbatimModuleSyntax: true,
 };
 
 export function generateTsconfig({ isMonorepo }: TsconfigOptions): string {

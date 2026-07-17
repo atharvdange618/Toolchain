@@ -26,7 +26,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
   const allDeps = getAllDeps(pkg);
   return {
     framework: detectFramework(allDeps),
-    hasReact: !!(allDeps.react || allDeps['react-dom']),
+    hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
     isMonorepo: detectMonorepo(pkg),
     packageManager: detectPackageManager(dir, pkg),
   };
@@ -37,21 +37,21 @@ export function pmExec(pm: PackageManager): string {
 }
 
 function detectFramework(allDeps: Record<string, string>): Framework {
-  if (allDeps.next) return 'next';
-  if (allDeps.express) return 'express';
-  if (allDeps.react || allDeps['react-dom']) return 'react';
+  if (allDeps['next']) return 'next';
+  if (allDeps['express']) return 'express';
+  if (allDeps['react'] || allDeps['react-dom']) return 'react';
   return 'plain';
 }
 
 function detectMonorepo(pkg: Record<string, unknown>): boolean {
   if ('workspaces' in pkg) return true;
-  const pnpmConfig = pkg.pnpm as Record<string, unknown> | undefined;
+  const pnpmConfig = pkg['pnpm'] as Record<string, unknown> | undefined;
   if (pnpmConfig && 'workspaces' in pnpmConfig) return true;
   return false;
 }
 
 function detectPackageManager(dir: string, pkg: Record<string, unknown>): PackageManager {
-  const userAgent = process.env.npm_config_user_agent ?? '';
+  const userAgent = process.env['npm_config_user_agent'] ?? '';
   if (userAgent.startsWith('pnpm')) return 'pnpm';
   if (userAgent.startsWith('yarn')) return 'yarn';
   if (userAgent.startsWith('bun')) return 'bun';
@@ -60,18 +60,18 @@ function detectPackageManager(dir: string, pkg: Record<string, unknown>): Packag
   if (existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
   if (existsSync(path.join(dir, 'bun.lockb'))) return 'bun';
 
-  const devEngines = pkg.devEngines as Record<string, unknown> | undefined;
-  const pmConfig = devEngines?.packageManager as Record<string, unknown> | undefined;
-  if (pmConfig?.name === 'pnpm') return 'pnpm';
-  if (pmConfig?.name === 'yarn') return 'yarn';
-  if (pmConfig?.name === 'bun') return 'bun';
+  const devEngines = pkg['devEngines'] as Record<string, unknown> | undefined;
+  const pmConfig = devEngines?.['packageManager'] as Record<string, unknown> | undefined;
+  if (pmConfig?.['name'] === 'pnpm') return 'pnpm';
+  if (pmConfig?.['name'] === 'yarn') return 'yarn';
+  if (pmConfig?.['name'] === 'bun') return 'bun';
 
   return 'npm';
 }
 
 function getAllDeps(pkg: Record<string, unknown>): Record<string, string> {
   return {
-    ...(pkg.dependencies as Record<string, string>),
-    ...(pkg.devDependencies as Record<string, string>),
+    ...(pkg['dependencies'] as Record<string, string>),
+    ...(pkg['devDependencies'] as Record<string, string>),
   };
 }

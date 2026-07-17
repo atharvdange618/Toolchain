@@ -37,13 +37,13 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   const pkgPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
 
-  const existingScripts = (pkg.scripts as Record<string, string>) ?? {};
+  const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};
   const conflicts = Object.keys(SCRIPTS).filter((key) => key in existingScripts);
   if (conflicts.length > 0) {
     warn(`Overwriting existing scripts: ${conflicts.join(', ')}`);
   }
 
-  pkg.scripts = preserveKeyOrder(existingScripts, SCRIPTS);
+  pkg['scripts'] = preserveKeyOrder(existingScripts, SCRIPTS);
   pkg['lint-staged'] = LINT_STAGED;
 
   const devDeps: Record<string, string> = { ...BASE_DEV_DEPS };
@@ -55,8 +55,8 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
     devDeps['@next/eslint-plugin-next'] = '^16.2.6';
   }
 
-  const existingDeps = (pkg.devDependencies as Record<string, string>) ?? {};
-  pkg.devDependencies = preserveKeyOrder(existingDeps, devDeps);
+  const existingDeps = (pkg['devDependencies'] as Record<string, string>) ?? {};
+  pkg['devDependencies'] = preserveKeyOrder(existingDeps, devDeps);
 
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 }
