@@ -15,6 +15,7 @@ export default tseslint.config(
       '**/*.config.*',
       '**/components/ui/**',
       '**/.env*',
+      '**/test-fixtures/**',
     ],
   },
   js.configs.recommended,
@@ -51,6 +52,7 @@ export default tseslint.config(
       'unicorn/no-useless-undefined': 'off',
       'unicorn/no-array-sort': 'off',
       'unicorn/import-style': 'off',
+      'unicorn/no-process-exit': 'off',
     },
   },
 );
