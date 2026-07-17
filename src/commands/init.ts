@@ -16,8 +16,8 @@ import { generateTsconfig } from '../generators/tsconfig.js';
 import { writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
-export async function init(options: { pm?: string; yes?: boolean }): Promise<void> {
-  const targetDir = process.cwd();
+export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
+  const targetDir = options.targetDir ?? process.cwd();
 
   step(1, 'Detecting project environment...');
   const projectInfo = detect(targetDir);
