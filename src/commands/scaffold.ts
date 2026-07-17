@@ -40,6 +40,7 @@ const NEXT_COMMAND: Record<TemplateType, string> = {
 // Templates that require a specific package manager
 const REQUIRED_PM: Partial<Record<TemplateType, PackageManager>> = {
   'pnpm-monorepo': 'pnpm',
+  turbo: 'pnpm',
 };
 
 export async function scaffold(
