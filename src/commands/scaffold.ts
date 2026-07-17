@@ -37,6 +37,11 @@ const NEXT_COMMAND: Record<TemplateType, string> = {
   turbo: 'dev',
 };
 
+// Templates that require a specific package manager
+const REQUIRED_PM: Partial<Record<TemplateType, PackageManager>> = {
+  'pnpm-monorepo': 'pnpm',
+};
+
 export async function scaffold(
   projectName: string,
   options: { pm?: string; template?: string; yes?: boolean },
@@ -91,8 +96,14 @@ export async function scaffold(
     process.exit(1);
   }
 
+  // Determine package manager - template requirements override user choice
   let pm: PackageManager = 'pnpm';
-  if (options.pm) {
+  if (REQUIRED_PM[template]) {
+    pm = REQUIRED_PM[template]!;
+    if (options.pm && options.pm !== pm) {
+      warn(`Template "${template}" requires ${pm}. Ignoring --pm ${options.pm}.`);
+    }
+  } else if (options.pm) {
     if (VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
       pm = options.pm as PackageManager;
     } else {
