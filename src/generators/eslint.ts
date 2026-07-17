@@ -59,6 +59,11 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';`);
     .map((l) => '  ' + l)
     .join('\n');
 
+  // For monorepos, skip type-checked rules since packages need to be built first
+  const typeCheckedConfig = info.isMonorepo
+    ? ''
+    : '  ...tseslint.configs.recommendedTypeChecked,\n';
+
   const sections = [
     imports.join('\n'),
     '',
@@ -66,12 +71,11 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';`);
     ignoresObj + ',',
     '  js.configs.recommended,',
     '  ...tseslint.configs.recommended,',
-    '  ...tseslint.configs.recommendedTypeChecked,',
+    typeCheckedConfig,
     `  unicorn.configs['flat/recommended'],`,
     "  perfectionist.configs['recommended-alphabetical'],",
     `  {
-    files: ['**/*.ts', '**/*.tsx'],
-    languageOptions: { parserOptions: { projectService: true } },
+    files: ['**/*.ts', '**/*.tsx'],${info.isMonorepo ? '' : '\n    languageOptions: { parserOptions: { projectService: true } },'}
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',

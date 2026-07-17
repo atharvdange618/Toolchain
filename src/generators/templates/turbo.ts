@@ -48,8 +48,8 @@ const APPS_WEB_PKG = `{
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/shared": "workspace:*",
-    "@repo/config": "workspace:*"
+    "@repo/config": "workspace:*",
+    "@repo/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
@@ -75,8 +75,8 @@ const APPS_MOBILE_PKG = `{
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/shared": "workspace:*",
-    "@repo/config": "workspace:*"
+    "@repo/config": "workspace:*",
+    "@repo/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
@@ -102,9 +102,9 @@ const APPS_API_PKG = `{
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/shared": "workspace:*",
     "@repo/config": "workspace:*",
-    "@repo/db": "workspace:*"
+    "@repo/db": "workspace:*",
+    "@repo/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
@@ -112,8 +112,8 @@ const APPS_API_PKG = `{
 }`;
 
 const APPS_API_INDEX = `import { config } from '@repo/config';
-import { logger } from '@repo/shared';
 import { db } from '@repo/db';
+import { logger } from '@repo/shared';
 
 logger.info('API server starting...');
 logger.info('Config:', config);
@@ -136,12 +136,12 @@ const PACKAGES_SHARED_PKG = `{
   }
 }`;
 
-const PACKAGES_SHARED_INDEX = `export function logger(msg: string, ...args: unknown[]): void {
-  console.log(\`[LOG] \${msg}\`, ...args);
+const PACKAGES_SHARED_INDEX = `export function formatDate(date: Date): string {
+  return date.toISOString();
 }
 
-export function formatDate(date: Date): string {
-  return date.toISOString();
+export function logger(msg: string, ...args: unknown[]): void {
+  console.log(\`[LOG] \${msg}\`, ...args);
 }
 `;
 
@@ -163,9 +163,9 @@ const PACKAGES_CONFIG_PKG = `{
 
 const PACKAGES_CONFIG_INDEX = `export const config = {
   appName: process.env['APP_NAME'] ?? 'my-app',
-  nodeEnv: process.env['NODE_ENV'] ?? 'development',
-  port: Number(process.env['PORT']) ?? 3000,
   databaseUrl: process.env['DATABASE_URL'] ?? 'postgresql://localhost:5432/mydb',
+  nodeEnv: process.env['NODE_ENV'] ?? 'development',
+  port: Number(process.env["PORT"] ?? "3000"),
 } as const;
 
 export type Config = typeof config;
@@ -190,15 +190,30 @@ const PACKAGES_DB_PKG = `{
   }
 }`;
 
-const PACKAGES_DB_INDEX = `import { config } from '@repo/config';
-
-export const db = {
+const PACKAGES_DB_INDEX = `export const db = {
   isConnected: () => true,
   query: (sql: string) => ({ rows: [], sql }),
 };
 
 export type Database = typeof db;
 `;
+
+function tsconfig(references?: string): string {
+  const ref = references ? `,\n  "references": [{ "path": "${references}" }]` : '';
+  return `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"]${ref}
+}
+`;
+}
 
 export function generateTurbo(ctx: TemplateContext): TemplateResult {
   return {
@@ -240,21 +255,4 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
       version: '0.1.0',
     },
   };
-}
-
-function tsconfig(references?: string): string {
-  const ref = references ? `,\n  "references": [{ "path": "${references}" }]` : '';
-  return `{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src"
-  },
-  "include": ["src"]${ref}
-}
-`;
 }
