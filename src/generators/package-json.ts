@@ -64,7 +64,7 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
 function preserveKeyOrder(original: Record<string, unknown>, merged: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(original)) {
-    result[key] = merged[key];
+    result[key] = key in merged ? merged[key] : original[key];
   }
   for (const key of Object.keys(merged)) {
     if (!(key in result)) result[key] = merged[key];
