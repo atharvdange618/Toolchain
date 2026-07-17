@@ -113,10 +113,10 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
       version: '0.1.0',
       packageManager: 'pnpm@9.0.0',
       scripts: {
-        build: 'pnpm exec turbo run build',
-        dev: 'pnpm exec turbo run dev',
-        lint: 'pnpm exec turbo run lint',
-        typecheck: 'pnpm exec turbo run typecheck',
+        build: 'pnpm turbo run build',
+        dev: 'pnpm turbo run dev',
+        lint: 'pnpm turbo run lint',
+        typecheck: 'pnpm turbo run typecheck',
       },
       devDependencies: {
         turbo: `^${turboVersion}`,
