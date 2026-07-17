@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { init } from './commands/init.js';
+import { scaffold } from './commands/scaffold.js';
+import { TEMPLATES } from './generators/templates/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,5 +28,13 @@ program
   .option('--yes', 'Skip prompts and use defaults')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
   .action(init);
+
+program
+  .command('scaffold <project-name>')
+  .description('Create a new project and initialize toolchain')
+  .option('--template <type>', `Project template (${TEMPLATES.join(', ')})`)
+  .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
+  .option('--yes', 'Skip prompts and use defaults')
+  .action(scaffold);
 
 program.parse();
