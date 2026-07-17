@@ -27,7 +27,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
   return {
     framework: detectFramework(allDeps),
     hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
-    isMonorepo: detectMonorepo(pkg),
+    isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
   };
 }
@@ -43,10 +43,11 @@ function detectFramework(allDeps: Record<string, string>): Framework {
   return 'plain';
 }
 
-function detectMonorepo(pkg: Record<string, unknown>): boolean {
+function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {
+  // Check for workspaces key in package.json (npm/yarn)
   if ('workspaces' in pkg) return true;
-  const pnpmConfig = pkg['pnpm'] as Record<string, unknown> | undefined;
-  if (pnpmConfig && 'workspaces' in pnpmConfig) return true;
+  // Check for pnpm-workspace.yaml (modern pnpm)
+  if (existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return true;
   return false;
 }
 
