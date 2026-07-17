@@ -15,6 +15,7 @@ export default tseslint.config(
       '**/*.config.*',
       '**/components/ui/**',
       '**/.env*',
+      '**/.expo/**',
       '**/test-fixtures/**',
     ],
   },

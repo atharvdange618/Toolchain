@@ -11,6 +11,7 @@ function getIgnores(isMonorepo: boolean): string[] {
     '**/*.config.*',
     '**/components/ui/**',
     '**/.env*',
+    '**/.expo/**',
   ];
   if (isMonorepo) base.splice(4, 0, '**/packages/*/dist/**');
   return base;
