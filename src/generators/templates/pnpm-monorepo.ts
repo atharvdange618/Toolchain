@@ -73,11 +73,11 @@ export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
 
       { content: pkgJson('@repo/api', { deps: { '@repo/config': 'workspace:*', '@repo/db': 'workspace:*', '@repo/shared': 'workspace:*' } }), path: 'apps/api/package.json' },
       { content: tsconfig(['../../packages/shared', '../../packages/config', '../../packages/db']), path: 'apps/api/tsconfig.json' },
-      { content: "import { config } from '@repo/config';\nimport { db } from '@repo/db';\nimport { logger } from '@repo/shared';\n\nlogger('API server starting...');\nlogger('Config:', config);\nlogger('Database connected:', db.isConnected());\n", path: 'apps/api/src/index.ts' },
+      { content: "import { config } from '@repo/config';\nimport { database } from '@repo/db';\nimport { logger } from '@repo/shared';\n\nlogger('API server starting...');\nlogger('Config:', config);\nlogger('Database connected:', database.isConnected());\n", path: 'apps/api/src/index.ts' },
 
       { content: pkgJson('@repo/shared'), path: 'packages/shared/package.json' },
       { content: tsconfig(), path: 'packages/shared/tsconfig.json' },
-      { content: "export function formatDate(date: Date): string {\n  return date.toISOString();\n}\n\nexport function logger(msg: string, ...args: unknown[]): void {\n  console.log(`[LOG] ${msg}`, ...args);\n}\n", path: 'packages/shared/src/index.ts' },
+      { content: "export function formatDate(date: Date): string {\n  return date.toISOString();\n}\n\nexport function logger(message: string, ...rest: unknown[]): void {\n  console.log(`[LOG] ${message}`, ...rest);\n}\n", path: 'packages/shared/src/index.ts' },
 
       { content: pkgJson('@repo/config'), path: 'packages/config/package.json' },
       { content: tsconfig(), path: 'packages/config/tsconfig.json' },
@@ -85,7 +85,7 @@ export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
 
       { content: pkgJson('@repo/db', { deps: { '@repo/config': 'workspace:*' } }), path: 'packages/db/package.json' },
       { content: tsconfig(['../../packages/config']), path: 'packages/db/tsconfig.json' },
-      { content: "export const db = {\n  isConnected: () => true,\n  query: (sql: string) => ({ rows: [], sql }),\n};\n\nexport type Database = typeof db;\n", path: 'packages/db/src/index.ts' },
+      { content: "export const database = {\n  isConnected: () => true,\n  query: (_sql: string) => ({ rows: [], sql: _sql }),\n};\n\nexport type Database = typeof database;\n", path: 'packages/db/src/index.ts' },
 
       { content: GITIGNORE, path: '.gitignore' },
     ],
