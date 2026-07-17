@@ -28,6 +28,15 @@ const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<type
   turbo: generateTurbo,
 };
 
+const NEXT_COMMAND: Record<TemplateType, string> = {
+  express: 'start',
+  nextjs: 'dev',
+  plain: 'build',
+  'pnpm-monorepo': 'dev',
+  react: 'dev',
+  turbo: 'dev',
+};
+
 export async function scaffold(
   projectName: string,
   options: { pm?: string; template?: string; yes?: boolean },
@@ -140,11 +149,12 @@ export async function scaffold(
   step(result.scaffold ? 2 : 5, 'Setting up toolchain...');
   await init({ pm, targetDir, yes: true });
 
+  const nextCmd = NEXT_COMMAND[template];
   console.log(`\n${'='.repeat(50)}`);
   success(`Project "${projectName}" is ready!`);
   console.log(`\nNext steps:`);
   console.log(`  cd ${projectName}`);
-  console.log(`  ${pm} run dev`);
+  console.log(`  ${pm} run ${nextCmd}`);
 }
 
 function isValidProjectName(name: string): boolean {
