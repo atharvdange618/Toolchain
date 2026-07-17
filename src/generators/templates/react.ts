@@ -17,28 +17,12 @@ export function generateReact(_ctx: TemplateContext): TemplateResult {
 function scaffoldReact(ctx: TemplateContext): void {
   const { packageManager: pm, projectName, targetDir } = ctx;
 
-  let createCmd: string;
-  switch (pm) {
-    case 'bun': {
-      createCmd = 'bun create vite';
-      break;
-    }
-    case 'npm': {
-      createCmd = 'npm create vite@latest';
-      break;
-    }
-    case 'yarn': {
-      createCmd = 'yarn create vite';
-      break;
-    }
-    default: {
-      createCmd = `${pm} create vite`;
-    }
-  }
+  // Use npx create-vite directly for reliable non-interactive scaffolding
+  const npx = pm === 'npm' ? 'npx' : `${pm} exec npx`;
 
   // create-vite creates the directory itself, so run from parent
   const parentDir = path.dirname(targetDir);
-  execSync(`${createCmd} ${projectName} --template react-ts`, {
+  execSync(`${npx} --yes create-vite@latest ${projectName} --template react-ts`, {
     cwd: parentDir,
     stdio: 'inherit',
   });

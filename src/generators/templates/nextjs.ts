@@ -18,11 +18,11 @@ function scaffoldNextjs(ctx: TemplateContext): void {
   const { packageManager: pm, projectName, targetDir } = ctx;
 
   // create-next-app expects npx even with pnpm
-  const createCmd = pm === 'npm' ? 'npx' : `${pm} exec npx`;
+  const npx = pm === 'npm' ? 'npx' : `${pm} exec npx`;
 
   // Run from parent directory since create-next-app creates the folder
   const parentDir = path.dirname(targetDir);
-  execSync(`${createCmd} create-next-app@latest ${projectName} --yes --use-${pm}`, {
+  execSync(`${npx} --yes create-next-app@latest ${projectName} --use-${pm}`, {
     cwd: parentDir,
     stdio: 'inherit',
   });
