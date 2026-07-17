@@ -253,6 +253,12 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
     packageJson: {
       name: ctx.projectName,
       version: '0.1.0',
+      scripts: {
+        build: 'turbo run build',
+        dev: 'turbo run dev',
+        lint: 'turbo run lint',
+        typecheck: 'turbo run typecheck',
+      },
     },
   };
 }

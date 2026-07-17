@@ -228,6 +228,12 @@ export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
     packageJson: {
       name: ctx.projectName,
       version: '0.1.0',
+      scripts: {
+        build: 'pnpm -r build',
+        dev: 'pnpm -r --parallel dev',
+        lint: 'pnpm -r lint',
+        typecheck: 'pnpm -r typecheck',
+      },
     },
   };
 }
