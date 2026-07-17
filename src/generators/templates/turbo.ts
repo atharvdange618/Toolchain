@@ -200,23 +200,6 @@ export const db = {
 export type Database = typeof db;
 `;
 
-function tsconfig(references?: string): string {
-  const ref = references ? `,\n  "references": [{ "path": "${references}" }]` : '';
-  return `{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src"
-  },
-  "include": ["src"]${ref}
-}
-`;
-}
-
 export function generateTurbo(ctx: TemplateContext): TemplateResult {
   return {
     files: [
@@ -257,4 +240,21 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
       version: '0.1.0',
     },
   };
+}
+
+function tsconfig(references?: string): string {
+  const ref = references ? `,\n  "references": [{ "path": "${references}" }]` : '';
+  return `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"]${ref}
+}
+`;
 }
