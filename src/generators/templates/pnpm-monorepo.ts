@@ -17,7 +17,8 @@ const CORE_PKG = `{
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "tsc --watch"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
@@ -40,7 +41,8 @@ const UI_PKG = `{
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "tsc --watch"
   },
   "dependencies": {
     "@repo/core": "workspace:*"

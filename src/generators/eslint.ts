@@ -12,7 +12,7 @@ function getIgnores(isMonorepo: boolean): string[] {
     '**/components/ui/**',
     '**/.env*',
   ];
-  if (isMonorepo) base.splice(4, 0, '**/packages/**');
+  if (isMonorepo) base.splice(4, 0, '**/packages/*/dist/**');
   return base;
 }
 
