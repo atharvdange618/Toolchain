@@ -1,9 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-
-export function fileExists(filePath: string): boolean {
-  return existsSync(path.resolve(filePath));
-}
 
 export function readFile(filePath: string): string {
   return readFileSync(path.resolve(filePath), 'utf8');
