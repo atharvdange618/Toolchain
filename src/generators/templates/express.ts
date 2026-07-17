@@ -1,4 +1,5 @@
 import type { TemplateContext, TemplateResult } from './index.js';
+import { getExpressVersion, getTypesExpressVersion, getTypesNodeVersion, getTypescriptVersion } from '../../utils/versions.js';
 
 const GITIGNORE = `node_modules/
 dist/
@@ -28,6 +29,11 @@ app.listen(port, () => {
 `;
 
 export function generateExpress(ctx: TemplateContext): TemplateResult {
+  const tsVersion = getTypescriptVersion();
+  const expressVersion = getExpressVersion();
+  const typesExpressVersion = getTypesExpressVersion();
+  const typesNodeVersion = getTypesNodeVersion();
+
   return {
     files: [
       { content: EXPRESS_ENTRY, path: 'src/index.ts' },
@@ -38,12 +44,12 @@ export function generateExpress(ctx: TemplateContext): TemplateResult {
     isMonorepo: false,
     packageJson: {
       dependencies: {
-        express: '^5.1.0',
+        express: `^${expressVersion}`,
       },
       devDependencies: {
-        '@types/express': '^5.0.2',
-        '@types/node': '^22.15.3',
-        typescript: '^5.8.3',
+        '@types/express': `^${typesExpressVersion}`,
+        '@types/node': `^${typesNodeVersion}`,
+        typescript: `^${tsVersion}`,
       },
       main: 'dist/index.js',
       name: ctx.projectName,
