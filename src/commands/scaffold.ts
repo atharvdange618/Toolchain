@@ -166,6 +166,7 @@ export async function scaffold(
   console.log(`\nNext steps:`);
   console.log(`  cd ${projectName}`);
   console.log(`  ${pm} run ${nextCmd}`);
+  console.log(`\nNote: If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`);
 }
 
 function isValidProjectName(name: string): boolean {
