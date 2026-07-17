@@ -7,6 +7,8 @@ const COMPILER_OPTIONS = {
   forceConsistentCasingInFileNames: true,
   module: 'ESNext',
   moduleResolution: 'bundler',
+  noFallthroughCasesInSwitch: true,
+  noImplicitOverride: true,
   noUncheckedIndexedAccess: true,
   noUnusedLocals: true,
   noUnusedParameters: true,
