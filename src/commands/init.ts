@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import prompts from 'prompts';
 
@@ -16,7 +17,7 @@ import { generateTsconfig } from '../generators/tsconfig.js';
 import { writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
-export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
+export async function init(options: { pm?: string; yes?: boolean; targetDir?: string }): Promise<void> {
   const targetDir = options.targetDir ?? process.cwd();
 
   step(1, 'Detecting project environment...');
@@ -54,9 +55,14 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('eslint.config.mjs');
 
   step(4, 'Generating TypeScript config...');
-  const tsconfig = generateTsconfig({ isMonorepo: projectInfo.isMonorepo });
-  writeFile(path.join(targetDir, 'tsconfig.json'), tsconfig);
-  success('tsconfig.json');
+  const tsconfigPath = path.join(targetDir, 'tsconfig.json');
+  if (existsSync(tsconfigPath)) {
+    info('tsconfig.json already exists, skipping (preserving existing config)');
+  } else {
+    const tsconfig = generateTsconfig({ isMonorepo: projectInfo.isMonorepo });
+    writeFile(tsconfigPath, tsconfig);
+    success('tsconfig.json');
+  }
 
   step(5, 'Writing Husky hooks...');
   writeHuskyHooks(targetDir, projectInfo.packageManager);
