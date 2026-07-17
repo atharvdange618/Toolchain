@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import path from 'node:path';
 import prompts from 'prompts';
 
-import { detect, pmExec, type PackageManager } from '../detectors/project.js';
+import { detect, type PackageManager, pmExec, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
 import { generateEslintConfig } from '../generators/eslint.js';
 import { writeHuskyHooks } from '../generators/husky.js';
 import { updatePackageJson } from '../generators/package-json.js';
@@ -14,7 +14,7 @@ import {
 } from '../generators/static-configs.js';
 import { generateTsconfig } from '../generators/tsconfig.js';
 import { writeFile } from '../utils/fs.js';
-import { info, step, success, warn } from '../utils/logger.js';
+import { error, info, step, success, warn } from '../utils/logger.js';
 
 export async function init(options: { pm?: string; yes?: boolean }): Promise<void> {
   const targetDir = process.cwd();
@@ -38,7 +38,7 @@ export async function init(options: { pm?: string; yes?: boolean }): Promise<voi
     }
   }
 
-  step(3, 'Writing config files...');
+  step(2, 'Writing config files...');
   writeFile(path.join(targetDir, '.editorconfig'), EDITORCONFIG);
   success('.editorconfig');
   writeFile(path.join(targetDir, '.prettierrc'), PRETTIERRC);
@@ -48,33 +48,46 @@ export async function init(options: { pm?: string; yes?: boolean }): Promise<voi
   writeFile(path.join(targetDir, 'commitlint.config.js'), COMMITLINT_CONFIG);
   success('commitlint.config.js');
 
-  step(4, 'Generating ESLint config...');
+  step(3, 'Generating ESLint config...');
   const eslintConfig = generateEslintConfig(projectInfo);
   writeFile(path.join(targetDir, 'eslint.config.mjs'), eslintConfig);
   success('eslint.config.mjs');
 
-  step(5, 'Generating TypeScript config...');
+  step(4, 'Generating TypeScript config...');
   const tsconfig = generateTsconfig({ isMonorepo: projectInfo.isMonorepo });
   writeFile(path.join(targetDir, 'tsconfig.json'), tsconfig);
   success('tsconfig.json');
 
-  step(6, 'Writing Husky hooks...');
+  step(5, 'Writing Husky hooks...');
   writeHuskyHooks(targetDir, projectInfo.packageManager);
   success('.husky/pre-commit');
   success('.husky/commit-msg');
 
-  step(7, 'Updating package.json...');
+  step(6, 'Updating package.json...');
   updatePackageJson(targetDir, projectInfo);
   success('package.json updated with scripts, lint-staged, and devDependencies');
 
-  const pm: PackageManager = (options.pm as PackageManager) ?? projectInfo.packageManager;
+  const pm: PackageManager =
+    options.pm && VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)
+      ? (options.pm as PackageManager)
+      : projectInfo.packageManager;
 
-  step(8, `Installing dependencies with ${pm}...`);
-  execSync(`${pm} install`, { cwd: targetDir, stdio: 'inherit' });
+  step(7, `Installing dependencies with ${pm}...`);
+  try {
+    execSync(`${pm} install`, { cwd: targetDir, stdio: 'inherit' });
+  } catch {
+    error(`Failed to install dependencies with ${pm}. Run "${pm} install" manually.`);
+    process.exit(1);
+  }
   success('Dependencies installed');
 
-  step(9, 'Initializing Husky...');
-  execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
+  step(8, 'Initializing Husky...');
+  try {
+    execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
+  } catch {
+    error('Failed to initialize Husky. Run "husky" manually.');
+    process.exit(1);
+  }
   success('Husky initialized');
 
   console.log(`\n${'='.repeat(50)}`);
