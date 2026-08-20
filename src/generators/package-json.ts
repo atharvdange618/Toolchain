@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { ProjectInfo } from '../detectors/project.js';
 
 import { warn } from '../utils/logger.js';
-import { getToolchainDeps, getReactDeps, getNextDeps } from '../utils/versions.js';
+import { getNextDeps, getReactDeps, getToolchainDeps } from '../utils/versions.js';
 
 const SCRIPTS: Record<string, string> = {
   format: 'prettier --write .',

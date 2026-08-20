@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
-import { getTypesNodeVersion, getTypescriptVersion } from '../../utils/versions.js';
+
+import { getTypescriptVersion, getTypesNodeVersion } from '../../utils/versions.js';
 
 const GITIGNORE = `node_modules/
 dist/
@@ -12,51 +13,6 @@ const PNPM_WORKSPACE = `packages:
   - "apps/*"
   - "packages/*"
 `;
-
-function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string {
-  const tsVersion = getTypescriptVersion();
-  const typesNodeVersion = getTypesNodeVersion();
-  const deps = opts?.deps ?? {};
-  return JSON.stringify({
-    name,
-    version: '0.0.0',
-    type: 'module',
-    main: 'dist/index.js',
-    types: 'dist/index.d.ts',
-    
-    scripts: {
-      build: 'tsc',
-      dev: 'tsc --watch',
-      lint: 'tsc --noEmit',
-      typecheck: 'tsc --noEmit',
-    },
-    dependencies: Object.keys(deps).length > 0 ? deps : undefined,
-    devDependencies: {
-      '@types/node': `^${typesNodeVersion}`,
-      typescript: `^${tsVersion}`,
-    },
-  }, null, 2) + '\n';
-}
-
-function tsconfig(refs?: string[]): string {
-  const references = refs?.length
-    ? `,\n  "references": [${refs.map((r) => `{"path":"${r}"}`).join(',')}]`
-    : '';
-  return `{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node"]
-  },
-  "include": ["src"]${references}
-}
-`;
-}
 
 export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
   return {
@@ -94,13 +50,58 @@ export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
     isMonorepo: true,
     packageJson: {
       name: ctx.projectName,
-      version: '0.1.0',
       scripts: {
         build: 'pnpm -r build',
         dev: 'pnpm -r --parallel dev',
         lint: 'pnpm -r lint',
         typecheck: 'pnpm -r typecheck',
       },
+      version: '0.1.0',
     },
   };
+}
+
+function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string {
+  const tsVersion = getTypescriptVersion();
+  const typesNodeVersion = getTypesNodeVersion();
+  const deps = opts?.deps ?? {};
+  return JSON.stringify({
+    dependencies: Object.keys(deps).length > 0 ? deps : undefined,
+    devDependencies: {
+      '@types/node': `^${typesNodeVersion}`,
+      typescript: `^${tsVersion}`,
+    },
+    main: 'dist/index.js',
+    name,
+    scripts: {
+      build: 'tsc',
+      dev: 'tsc --watch',
+      lint: 'tsc --noEmit',
+      typecheck: 'tsc --noEmit',
+    },
+    
+    type: 'module',
+    types: 'dist/index.d.ts',
+    version: '0.0.0',
+  }, null, 2) + '\n';
+}
+
+function tsconfig(refs?: string[]): string {
+  const references = refs?.length
+    ? `,\n  "references": [${refs.map((r) => `{"path":"${r}"}`).join(',')}]`
+    : '';
+  return `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src"]${references}
+}
+`;
 }

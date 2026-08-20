@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
-import { getTurboVersion, getTypesNodeVersion, getTypescriptVersion } from '../../utils/versions.js';
+
+import { getTurboVersion, getTypescriptVersion, getTypesNodeVersion } from '../../utils/versions.js';
 
 const GITIGNORE = `node_modules/
 dist/
@@ -13,63 +14,6 @@ const PNPM_WORKSPACE = `packages:
   - "apps/*"
   - "packages/*"
 `;
-
-function turboJson(): string {
-  return JSON.stringify({
-    $schema: 'https://turbo.build/schema.json',
-    tasks: {
-      build: { dependsOn: ['^build'], outputs: ['dist/**'] },
-      dev: { cache: false, persistent: true },
-      lint: { dependsOn: ['^build'] },
-      typecheck: { dependsOn: ['^build'] },
-      clean: { cache: false },
-    },
-  }, null, 2) + '\n';
-}
-
-function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string {
-  const tsVersion = getTypescriptVersion();
-  const typesNodeVersion = getTypesNodeVersion();
-  const deps = opts?.deps ?? {};
-  return JSON.stringify({
-    name,
-    version: '0.0.0',
-    type: 'module',
-    main: 'dist/index.js',
-    types: 'dist/index.d.ts',
-    scripts: {
-      build: 'tsc',
-      dev: 'node --watch src/index.ts',
-      lint: 'tsc --noEmit',
-      typecheck: 'tsc --noEmit',
-    },
-    dependencies: Object.keys(deps).length > 0 ? deps : undefined,
-    devDependencies: {
-      '@types/node': `^${typesNodeVersion}`,
-      typescript: `^${tsVersion}`,
-    },
-  }, null, 2) + '\n';
-}
-
-function tsconfig(refs?: string[]): string {
-  const references = refs?.length
-    ? `,\n  "references": [${refs.map((r) => `{"path":"${r}"}`).join(',')}]`
-    : '';
-  return `{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node"]
-  },
-  "include": ["src"]${references}
-}
-`;
-}
 
 export function generateTurbo(ctx: TemplateContext): TemplateResult {
   const turboVersion = getTurboVersion();
@@ -109,8 +53,10 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
     hasReact: false,
     isMonorepo: true,
     packageJson: {
+      devDependencies: {
+        turbo: `^${turboVersion}`,
+      },
       name: ctx.projectName,
-      version: '0.1.0',
       packageManager: 'pnpm@9.0.0',
       scripts: {
         build: 'pnpm turbo run build',
@@ -118,9 +64,64 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
         lint: 'pnpm turbo run lint',
         typecheck: 'pnpm turbo run typecheck',
       },
-      devDependencies: {
-        turbo: `^${turboVersion}`,
-      },
+      version: '0.1.0',
     },
   };
+}
+
+function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string {
+  const tsVersion = getTypescriptVersion();
+  const typesNodeVersion = getTypesNodeVersion();
+  const deps = opts?.deps ?? {};
+  return JSON.stringify({
+    dependencies: Object.keys(deps).length > 0 ? deps : undefined,
+    devDependencies: {
+      '@types/node': `^${typesNodeVersion}`,
+      typescript: `^${tsVersion}`,
+    },
+    main: 'dist/index.js',
+    name,
+    scripts: {
+      build: 'tsc',
+      dev: 'node --watch src/index.ts',
+      lint: 'tsc --noEmit',
+      typecheck: 'tsc --noEmit',
+    },
+    type: 'module',
+    types: 'dist/index.d.ts',
+    version: '0.0.0',
+  }, null, 2) + '\n';
+}
+
+function tsconfig(refs?: string[]): string {
+  const references = refs?.length
+    ? `,\n  "references": [${refs.map((r) => `{"path":"${r}"}`).join(',')}]`
+    : '';
+  return `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src"]${references}
+}
+`;
+}
+
+function turboJson(): string {
+  return JSON.stringify({
+    $schema: 'https://turbo.build/schema.json',
+    tasks: {
+      build: { dependsOn: ['^build'], outputs: ['dist/**'] },
+      clean: { cache: false },
+      dev: { cache: false, persistent: true },
+      lint: { dependsOn: ['^build'] },
+      typecheck: { dependsOn: ['^build'] },
+    },
+  }, null, 2) + '\n';
 }

@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
-import { getExpressVersion, getTypesExpressVersion, getTypesNodeVersion, getTypescriptVersion } from '../../utils/versions.js';
+
+import { getExpressVersion, getTypescriptVersion, getTypesExpressVersion, getTypesNodeVersion } from '../../utils/versions.js';
 
 const GITIGNORE = `node_modules/
 dist/
