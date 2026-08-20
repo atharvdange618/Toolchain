@@ -1,5 +1,6 @@
 dist/
 node_modules/
 *.tgz
-test-fixtures/
+test-fixtures/*
+!test-fixtures/test-init.sh
 .mimocode/
