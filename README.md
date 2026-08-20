@@ -120,12 +120,12 @@ The generated `tsconfig.json` includes strict options:
 
 The generated `eslint.config.mjs` adapts based on what's in your `package.json`:
 
-| Detected | Plugins included                                           |
-| -------- | ---------------------------------------------------------- |
-| Plain TS | `typescript-eslint`, `unicorn`, `perfectionist`            |
-| React    | Above + `eslint-plugin-react`, `eslint-plugin-react-hooks` |
-| Next.js  | Above + `@next/eslint-plugin-next`                         |
-| Express  | Same as Plain TS but `no-unsafe-*` rules relaxed to `warn` |
+| Detected | Plugins included                                                                                               |
+| -------- | -------------------------------------------------------------------------------------------------------------- |
+| Plain TS | `typescript-eslint`, `unicorn`, `perfectionist`                                                                |
+| React    | Above + `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-react-you-might-not-need-an-effect` |
+| Next.js  | Above + `@next/eslint-plugin-next`                                                                             |
+| Express  | Same as Plain TS but `no-unsafe-*` rules relaxed to `warn`                                                     |
 
 **Ignored directories:** `node_modules`, `dist`, `.next`, `build`, `.expo`, `.pnpm-store`, `*.config.*`, `.env*`
 

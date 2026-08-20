@@ -11,7 +11,11 @@ export function getNextDeps(): Record<string, string> {
 }
 
 export function getReactDeps(): Record<string, string> {
-  return getVersions(['eslint-plugin-react', 'eslint-plugin-react-hooks']);
+  return getVersions([
+    'eslint-plugin-react',
+    'eslint-plugin-react-hooks',
+    'eslint-plugin-react-you-might-not-need-an-effect',
+  ]);
 }
 
 export function getToolchainDeps(): Record<string, string> {

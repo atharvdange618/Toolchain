@@ -98,4 +98,18 @@ describe('generateEslintConfig', () => {
     expect(output).toContain("import reactPlugin from 'eslint-plugin-react'");
     expect(output).toContain("import nextPlugin from '@next/eslint-plugin-next'");
   });
+
+  it('adds the you-might-not-need-an-effect config wherever the react block appears', () => {
+    const reactOutput = generateEslintConfig({ ...BASE_INFO, hasReact: true });
+    const nextOutput = generateEslintConfig({ ...BASE_INFO, framework: 'next', hasReact: false });
+    const plainOutput = generateEslintConfig(BASE_INFO);
+
+    for (const output of [reactOutput, nextOutput]) {
+      expect(output).toContain(
+        "import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect'",
+      );
+      expect(output).toContain('reactYouMightNotNeedAnEffect.configs.recommended');
+    }
+    expect(plainOutput).not.toContain('eslint-plugin-react-you-might-not-need-an-effect');
+  });
 });

@@ -48,7 +48,8 @@ import unicorn from 'eslint-plugin-unicorn';`,
 
   if (info.hasReact || info.framework === 'next') {
     imports.push(`import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';`);
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';`);
   }
   if (info.framework === 'next') {
     imports.push(`import nextPlugin from '@next/eslint-plugin-next';`);
@@ -97,7 +98,8 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';`);
       'react/prop-types': 'off',
     },
     settings: { react: { version: 'detect' } },
-  },`);
+  },
+  reactYouMightNotNeedAnEffect.configs.recommended,`);
   }
 
   if (info.framework === 'next') {

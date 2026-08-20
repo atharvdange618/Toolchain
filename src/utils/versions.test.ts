@@ -109,3 +109,18 @@ describe('getToolchainDeps', () => {
     expect(() => getToolchainDeps()).toThrow();
   });
 });
+
+describe('getReactDeps', () => {
+  it('includes eslint-plugin-react, eslint-plugin-react-hooks, and the you-might-not-need-an-effect plugin', async () => {
+    const { getReactDeps } = await import('./versions.js');
+    mockedExecSync.mockReturnValue('1.2.3\n');
+
+    const deps = getReactDeps();
+
+    expect(deps).toEqual({
+      'eslint-plugin-react': '^1.2.3',
+      'eslint-plugin-react-hooks': '^1.2.3',
+      'eslint-plugin-react-you-might-not-need-an-effect': '^1.2.3',
+    });
+  });
+});
