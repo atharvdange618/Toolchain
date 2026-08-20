@@ -17,6 +17,22 @@ function getIgnores(isMonorepo: boolean): string[] {
   return base;
 }
 
+// Hand-built rather than JSON.stringify: JSON always produces double-quoted
+// keys/strings with no trailing comma, which fights the singleQuote and
+// trailingComma settings in the .prettierrc this same tool generates -
+// every fresh `init` would ship an eslint.config.mjs that fails its own
+// `prettier --check` before the user touches a line of their own code.
+function getIgnoresBlock(isMonorepo: boolean): string {
+  const items = getIgnores(isMonorepo)
+    .map((item) => `      '${item}',`)
+    .join('\n');
+  return `  {
+    ignores: [
+${items}
+    ],
+  }`;
+}
+
 const UNICORN_RULES = `
       'unicorn/prevent-abbreviations': 'off',
       'unicorn/no-null': 'off',
@@ -71,11 +87,6 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';`);
     imports.push(`import nextPlugin from '@next/eslint-plugin-next';`);
   }
 
-  const ignoresObj = JSON.stringify({ ignores: getIgnores(info.isMonorepo) }, null, 2)
-    .split('\n')
-    .map((l) => '  ' + l)
-    .join('\n');
-
   // For monorepos, skip type-checked rules since packages need to be built first
   const typeCheckedConfig = info.isMonorepo
     ? ''
@@ -85,7 +96,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';`);
     imports.join('\n'),
     '',
     'export default tseslint.config(',
-    ignoresObj + ',',
+    getIgnoresBlock(info.isMonorepo) + ',',
     '  js.configs.recommended,',
     '  ...tseslint.configs.recommended,',
     typeCheckedConfig,

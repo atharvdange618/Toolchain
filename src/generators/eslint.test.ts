@@ -1,11 +1,18 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import * as prettier from 'prettier';
 import { describe, expect, it } from 'vitest';
 
 import type { ProjectInfo } from '../detectors/project.js';
 
 import { generateEslintConfig } from './eslint.js';
+import { PRETTIERRC } from './static-configs.js';
+
+const PRETTIER_OPTIONS = {
+  ...(JSON.parse(PRETTIERRC) as Record<string, unknown>),
+  parser: 'babel',
+};
 
 const BASE_INFO: ProjectInfo = {
   framework: 'plain',
@@ -144,4 +151,28 @@ describe('generateEslintConfig', () => {
     expect(plainOutput).not.toContain("'import-x/no-unresolved'");
     expect(Array.isArray(config)).toBe(true);
   });
+
+  it.each([
+    ['plain', BASE_INFO],
+    ['express', { ...BASE_INFO, framework: 'express' }],
+    ['react', { ...BASE_INFO, hasReact: true }],
+    ['next', { ...BASE_INFO, framework: 'next', hasReact: true }],
+    ['monorepo', { ...BASE_INFO, isMonorepo: true }],
+  ] as const)(
+    "generates output that already matches the tool's own .prettierrc for %s",
+    async (_name, info) => {
+      const output = generateEslintConfig(info);
+
+      // Regression guard for a real bug: generateEslintConfig used to build
+      // the ignores block with JSON.stringify, which always produces
+      // double-quoted keys/strings and no trailing comma - conflicting with
+      // the singleQuote/trailingComma settings in the .prettierrc this same
+      // tool generates. Every fresh `init` shipped an eslint.config.mjs that
+      // failed `prettier --check` before the user touched a line of their
+      // own code. This runs the real prettier package against the real
+      // generated output with the real generated .prettierrc, so any future
+      // string-templating drift fails here instead of shipping.
+      await expect(prettier.check(output, PRETTIER_OPTIONS)).resolves.toBe(true);
+    },
+  );
 });
