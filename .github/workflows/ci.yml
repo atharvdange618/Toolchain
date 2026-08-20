@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # vitest 4 requires Node ^20 || ^22 || >=24 and won't run at all on
+        # Node 18, so 18 can't be a matrix leg here even though engines.node
+        # in package.json says >=18 - that floor describes the published
+        # CLI's runtime deps (commander, picocolors, prompts, semver), none
+        # of which need anything past Node 18, but CI can't verify that
+        # claim without a Node 18 runner to actually execute against.
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@${{ matrix.node-version }}
+          cache: true
+          install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run lint
+
+      - run: pnpm run typecheck
+
+      - run: pnpm run test
+
+      - run: pnpm run build
