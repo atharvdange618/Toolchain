@@ -6,12 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectInfo } from '../detectors/project.js';
 
 vi.mock('../utils/versions.js', () => ({
-  getNextDeps: vi.fn(() => ({ '@next/eslint-plugin-next': '^15.0.0' })),
-  getReactDeps: vi.fn(() => ({
-    'eslint-plugin-react': '^7.0.0',
-    'eslint-plugin-react-hooks': '^5.0.0',
-  })),
-  getToolchainDeps: vi.fn(() => ({ eslint: '^9.0.0', prettier: '^3.0.0' })),
+  getEslintDeps: vi.fn((info: { framework: string; hasReact: boolean }) => {
+    const deps: Record<string, string> = { eslint: '^9.0.0' };
+    if (info.hasReact || info.framework === 'next') {
+      deps['eslint-plugin-react'] = '^7.0.0';
+      deps['eslint-plugin-react-hooks'] = '^5.0.0';
+    }
+    if (info.framework === 'next') {
+      deps['@next/eslint-plugin-next'] = '^15.0.0';
+    }
+    return deps;
+  }),
+  getToolchainDeps: vi.fn(() => ({ prettier: '^3.0.0' })),
 }));
 
 vi.mock('../utils/logger.js', () => ({

@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { ProjectInfo } from '../detectors/project.js';
 
 import { warn } from '../utils/logger.js';
-import { getNextDeps, getReactDeps, getToolchainDeps } from '../utils/versions.js';
+import { getEslintDeps, getToolchainDeps } from '../utils/versions.js';
 
 const SCRIPTS: Record<string, string> = {
   commit: 'cz',
@@ -43,15 +43,7 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   const existingConfig = (pkg['config'] as Record<string, unknown>) ?? {};
   pkg['config'] = { ...existingConfig, commitizen: COMMITIZEN_CONFIG };
 
-  const devDeps: Record<string, string> = { ...getToolchainDeps() };
-  if (info.hasReact || info.framework === 'next') {
-    const reactDeps = getReactDeps();
-    Object.assign(devDeps, reactDeps);
-  }
-  if (info.framework === 'next') {
-    const nextDeps = getNextDeps();
-    Object.assign(devDeps, nextDeps);
-  }
+  const devDeps: Record<string, string> = { ...getToolchainDeps(), ...getEslintDeps(info) };
 
   const existingDeps = (pkg['devDependencies'] as Record<string, string>) ?? {};
   const depConflicts = Object.keys(devDeps).filter(
