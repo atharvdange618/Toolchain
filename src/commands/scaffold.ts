@@ -122,7 +122,13 @@ export async function scaffold(
   };
 
   const generator = GENERATORS[template];
-  const result = generator(ctx);
+  let result: ReturnType<typeof generator>;
+  try {
+    result = generator(ctx);
+  } catch (error_) {
+    error(error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`);
+    process.exit(1);
+  }
 
   if (result.scaffold) {
     // CLI-based template (react, nextjs) - let the external tool handle project creation

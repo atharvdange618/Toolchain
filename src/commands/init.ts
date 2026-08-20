@@ -70,7 +70,14 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('.husky/commit-msg');
 
   step(6, 'Updating package.json...');
-  updatePackageJson(targetDir, projectInfo);
+  try {
+    updatePackageJson(targetDir, projectInfo);
+  } catch (error_) {
+    error(
+      error_ instanceof Error ? error_.message : 'Failed to resolve toolchain dependency versions.',
+    );
+    process.exit(1);
+  }
   success('package.json updated with scripts, lint-staged, and devDependencies');
 
   const pm: PackageManager =

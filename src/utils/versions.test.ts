@@ -4,14 +4,8 @@ vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));
 
-vi.mock('./logger.js', () => ({
-  warn: vi.fn(),
-}));
-
 const { execSync } = await import('node:child_process');
-const { warn } = await import('./logger.js');
 const mockedExecSync = vi.mocked(execSync);
-const mockedWarn = vi.mocked(warn);
 
 // versions.ts caches results in a module-level Map, so each test uses a
 // unique fake package name to avoid bleeding state across tests.
@@ -23,15 +17,14 @@ function uniquePkg(): string {
 
 beforeEach(() => {
   mockedExecSync.mockReset();
-  mockedWarn.mockReset();
   // getTypescriptVersion always resolves the same hardcoded pinned spec, so
   // without a fresh module instance per test its result would be cached
-  // by whichever test runs first, hiding the fallback path in later tests.
+  // by whichever test runs first, hiding the failure path in later tests.
   vi.resetModules();
 });
 
 describe('getVersions', () => {
-  it('resolves each package to a caret-prefixed version without warning', async () => {
+  it('resolves each package to a caret-prefixed version', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
     mockedExecSync.mockReturnValue('2.5.0\n');
@@ -42,23 +35,19 @@ describe('getVersions', () => {
     expect(mockedExecSync).toHaveBeenCalledWith(`npm view ${pkg} version`, {
       encoding: 'utf8',
     });
-    expect(mockedWarn).not.toHaveBeenCalled();
   });
 
-  it('falls back to the valid range "*" and warns when the npm lookup fails', async () => {
+  it('throws instead of degrading to an unconstrained or invalid range when the npm lookup fails', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
     mockedExecSync.mockImplementation(() => {
       throw new Error('network error');
     });
 
-    const result = getVersions([pkg]);
-
-    // A failed lookup must never be blindly wrapped in `^${...}` -- that
-    // used to produce the literal string "^*", an invalid semver range
-    // that makes `npm install` fail outright in the generated project.
-    expect(result).toEqual({ [pkg]: '*' });
-    expect(mockedWarn).toHaveBeenCalledWith(expect.stringContaining(pkg));
+    // A failed lookup aborts the whole init/scaffold run rather than
+    // silently writing a looser dependency range (or the invalid range
+    // "^*" a naive `^${fallback}` wrap used to produce).
+    expect(() => getVersions([pkg])).toThrow(pkg);
   });
 
   it('caches a resolved version instead of calling npm view again', async () => {
@@ -86,14 +75,13 @@ describe('getTypescriptVersion', () => {
     expect(version).toBe('^6.0.3');
   });
 
-  it('falls back to "*" and warns when the pinned lookup fails', async () => {
+  it('throws when the pinned lookup fails', async () => {
     const { getTypescriptVersion } = await import('./versions.js');
     mockedExecSync.mockImplementation(() => {
       throw new Error('network error');
     });
 
-    expect(getTypescriptVersion()).toBe('*');
-    expect(mockedWarn).toHaveBeenCalledWith(expect.stringContaining('typescript@6.0.3'));
+    expect(() => getTypescriptVersion()).toThrow('typescript@6.0.3');
   });
 });
 
@@ -110,5 +98,14 @@ describe('getToolchainDeps', () => {
     for (const version of Object.values(deps)) {
       expect(version).toBe('^9.9.9');
     }
+  });
+
+  it('throws on the first package that fails to resolve', async () => {
+    const { getToolchainDeps } = await import('./versions.js');
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('network error');
+    });
+
+    expect(() => getToolchainDeps()).toThrow();
   });
 });

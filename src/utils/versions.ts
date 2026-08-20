@@ -1,7 +1,5 @@
 import { execSync } from 'node:child_process';
 
-import { warn } from './logger.js';
-
 const VERSION_CACHE = new Map<string, string>();
 
 export function getExpressVersion(): string {
@@ -67,17 +65,16 @@ function getLatestVersion(pkg: string): string | undefined {
   }
 }
 
-// Resolves a package to a caret range. Never blindly prepends "^" to a
-// failed lookup - that used to produce the invalid semver range "^*".
-// Falls back to the bare "*" (any version) and warns, since the caller
-// still needs a value to write into package.json.
+// Resolves a package to a caret range. A failed lookup throws rather than
+// degrading to an unconstrained "*" (or worse, the invalid range "^*") -
+// the caller aborts the whole init/scaffold run instead of writing a
+// looser dependency range than the rest of the toolchain promises.
 function toRange(pkg: string): string {
   const version = getLatestVersion(pkg);
   if (version === undefined) {
-    warn(
-      `Could not resolve the latest version of "${pkg}" from npm. Falling back to "*" (unconstrained) - check your network and consider pinning it manually.`,
+    throw new Error(
+      `Could not resolve the latest version of "${pkg}" from npm. Check your network connection and try again.`,
     );
-    return '*';
   }
   return `^${version}`;
 }
