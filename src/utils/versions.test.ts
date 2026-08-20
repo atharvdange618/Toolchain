@@ -93,7 +93,17 @@ describe('getToolchainDeps', () => {
     const deps = getToolchainDeps();
 
     expect(Object.keys(deps)).toEqual(
-      expect.arrayContaining(['eslint', 'prettier', 'husky', 'lint-staged', 'typescript-eslint']),
+      expect.arrayContaining([
+        'eslint',
+        'prettier',
+        'husky',
+        'lint-staged',
+        'typescript-eslint',
+        'eslint-plugin-import-x',
+        'eslint-import-resolver-typescript',
+        'commitizen',
+        '@commitlint/cz-commitlint',
+      ]),
     );
     for (const version of Object.values(deps)) {
       expect(version).toBe('^9.9.9');
@@ -111,13 +121,14 @@ describe('getToolchainDeps', () => {
 });
 
 describe('getReactDeps', () => {
-  it('includes eslint-plugin-react, eslint-plugin-react-hooks, and the you-might-not-need-an-effect plugin', async () => {
+  it('includes eslint-plugin-react, react-hooks, jsx-a11y, and the you-might-not-need-an-effect plugin', async () => {
     const { getReactDeps } = await import('./versions.js');
     mockedExecSync.mockReturnValue('1.2.3\n');
 
     const deps = getReactDeps();
 
     expect(deps).toEqual({
+      'eslint-plugin-jsx-a11y': '^1.2.3',
       'eslint-plugin-react': '^1.2.3',
       'eslint-plugin-react-hooks': '^1.2.3',
       'eslint-plugin-react-you-might-not-need-an-effect': '^1.2.3',

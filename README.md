@@ -88,16 +88,16 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 
 ## What it sets up
 
-| Config                            | Generated variant                                              |
-| --------------------------------- | -------------------------------------------------------------- |
-| `.editorconfig`                   | Static                                                         |
-| `.prettierrc` / `.prettierignore` | Static                                                         |
-| `commitlint.config.js`            | Static                                                         |
-| `eslint.config.mjs`               | Plain TS / React / Next.js / Express rules, ignores `.expo/`   |
-| `tsconfig.json`                   | Strict config with project references (monorepo)               |
-| `.husky/pre-commit`               | `lint-staged` + `typecheck`                                    |
-| `.husky/commit-msg`               | `commitlint`                                                   |
-| `package.json`                    | Scripts, `lint-staged` config, devDependencies                 |
+| Config                            | Generated variant                                                   |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `.editorconfig`                   | Static                                                              |
+| `.prettierrc` / `.prettierignore` | Static                                                              |
+| `commitlint.config.js`            | Static                                                              |
+| `eslint.config.mjs`               | Plain TS / React / Next.js / Express rules, ignores `.expo/`        |
+| `tsconfig.json`                   | Strict config with project references (monorepo)                    |
+| `.husky/pre-commit`               | `lint-staged` + `typecheck`                                         |
+| `.husky/commit-msg`               | `commitlint`                                                        |
+| `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies |
 
 ## TypeScript configuration
 
@@ -120,16 +120,28 @@ The generated `tsconfig.json` includes strict options:
 
 The generated `eslint.config.mjs` adapts based on what's in your `package.json`:
 
-| Detected | Plugins included                                                                                               |
-| -------- | -------------------------------------------------------------------------------------------------------------- |
-| Plain TS | `typescript-eslint`, `unicorn`, `perfectionist`                                                                |
-| React    | Above + `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-react-you-might-not-need-an-effect` |
-| Next.js  | Above + `@next/eslint-plugin-next`                                                                             |
-| Express  | Same as Plain TS but `no-unsafe-*` rules relaxed to `warn`                                                     |
+| Detected | Plugins included                                                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Plain TS | `typescript-eslint`, `unicorn`, `perfectionist`, `eslint-plugin-import-x`                                                                |
+| React    | Above + `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-react-you-might-not-need-an-effect`, `eslint-plugin-jsx-a11y` |
+| Next.js  | Above + `@next/eslint-plugin-next`                                                                                                       |
+| Express  | Same as Plain TS but `no-unsafe-*` rules relaxed to `warn`                                                                               |
+
+`eslint-plugin-import-x` is applied to every project, resolved through `eslint-import-resolver-typescript` so it understands tsconfig paths and monorepo workspace packages. Only `no-cycle`, `no-duplicates`, `no-self-import`, and `no-useless-path-segments` are enabled - the resolution rules (`no-unresolved`, `named`, `namespace`, `default`, `export`) are left off since `tsc` already catches those, and they're prone to false positives on path aliases.
 
 **Ignored directories:** `node_modules`, `dist`, `.next`, `build`, `.expo`, `.pnpm-store`, `*.config.*`, `.env*`
 
 For monorepos, also ignores `**/packages/*/dist/**`.
+
+## Commit messages
+
+Every generated project gets an interactive commit prompt on top of commitlint's enforcement:
+
+```bash
+pnpm run commit
+```
+
+This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It reads the same `commitlint.config.js` this tool generates, so the prompt's types and rules always match what the `commit-msg` hook actually enforces - there's no separate config to keep in sync.
 
 ## Detection logic
 

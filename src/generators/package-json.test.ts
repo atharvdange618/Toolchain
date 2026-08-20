@@ -54,11 +54,36 @@ describe('updatePackageJson', () => {
     const pkg = readPkg();
 
     expect(pkg['scripts']).toMatchObject({
+      commit: 'cz',
       lint: 'eslint .',
       typecheck: 'tsc --noEmit',
     });
     expect(pkg['lint-staged']).toBeDefined();
     expect(pkg['devDependencies']).toMatchObject({ eslint: '^9.0.0', prettier: '^3.0.0' });
+  });
+
+  it('wires up commitizen to read prompts from the generated commitlint config', () => {
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
+
+    updatePackageJson(dir, BASE_INFO);
+    const pkg = readPkg();
+
+    expect(pkg['config']).toEqual({ commitizen: { path: '@commitlint/cz-commitlint' } });
+  });
+
+  it('preserves other config.* keys when adding commitizen', () => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ config: { 'some-other-tool': { setting: true } }, name: 'my-app' }),
+    );
+
+    updatePackageJson(dir, BASE_INFO);
+    const pkg = readPkg();
+
+    expect(pkg['config']).toEqual({
+      commitizen: { path: '@commitlint/cz-commitlint' },
+      'some-other-tool': { setting: true },
+    });
   });
 
   it('preserves existing scripts that do not conflict', () => {

@@ -38,18 +38,34 @@ const EXPRESS_WARN_RULES = `
       '@typescript-eslint/no-unsafe-member-access': 'warn',
       '@typescript-eslint/no-unsafe-return': 'warn',`;
 
+// Deliberately excludes import-x's no-unresolved/named/namespace/default/export -
+// those largely duplicate what tsc already guarantees via
+// recommendedTypeChecked, and are prone to false positives on TS path
+// aliases and monorepo workspace packages. no-cycle is off by default in
+// the plugin's own "recommended" preset (expensive), so it's opted in here
+// explicitly since import cycles are exactly the kind of bug tsc won't
+// catch.
+const IMPORT_X_RULES = `
+      'import-x/no-cycle': 'warn',
+      'import-x/no-duplicates': 'warn',
+      'import-x/no-self-import': 'error',
+      'import-x/no-useless-path-segments': 'warn',`;
+
 export function generateEslintConfig(info: ProjectInfo): string {
   const imports = [
     `import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import perfectionist from 'eslint-plugin-perfectionist';
-import unicorn from 'eslint-plugin-unicorn';`,
+import unicorn from 'eslint-plugin-unicorn';
+import importX from 'eslint-plugin-import-x';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';`,
   ];
 
   if (info.hasReact || info.framework === 'next') {
     imports.push(`import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';`);
+import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';
+import jsxA11y from 'eslint-plugin-jsx-a11y';`);
   }
   if (info.framework === 'next') {
     imports.push(`import nextPlugin from '@next/eslint-plugin-next';`);
@@ -77,11 +93,16 @@ import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need
     "  perfectionist.configs['recommended-alphabetical'],",
     `  {
     files: ['**/*.ts', '**/*.tsx'],${info.isMonorepo ? '' : '\n    languageOptions: { parserOptions: { projectService: true } },'}
+    plugins: { 'import-x': importX },
+    settings: {
+      'import-x/resolver-next': [createTypeScriptImportResolver({ alwaysTryTypes: true })],
+    },
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],${info.framework === 'express' ? EXPRESS_WARN_RULES : ''}
+      ${IMPORT_X_RULES.trim()}
       ${UNICORN_RULES.trim()}
     },
   },`,
@@ -99,7 +120,8 @@ import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need
     },
     settings: { react: { version: 'detect' } },
   },
-  reactYouMightNotNeedAnEffect.configs.recommended,`);
+  reactYouMightNotNeedAnEffect.configs.recommended,
+  jsxA11y.flatConfigs.recommended,`);
   }
 
   if (info.framework === 'next') {

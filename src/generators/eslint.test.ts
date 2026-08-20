@@ -112,4 +112,36 @@ describe('generateEslintConfig', () => {
     }
     expect(plainOutput).not.toContain('eslint-plugin-react-you-might-not-need-an-effect');
   });
+
+  it('adds jsx-a11y wherever the react block appears, but not for a plain project', () => {
+    const reactOutput = generateEslintConfig({ ...BASE_INFO, hasReact: true });
+    const nextOutput = generateEslintConfig({ ...BASE_INFO, framework: 'next', hasReact: false });
+    const plainOutput = generateEslintConfig(BASE_INFO);
+
+    for (const output of [reactOutput, nextOutput]) {
+      expect(output).toContain("import jsxA11y from 'eslint-plugin-jsx-a11y'");
+      expect(output).toContain('jsxA11y.flatConfigs.recommended');
+    }
+    expect(plainOutput).not.toContain('eslint-plugin-jsx-a11y');
+  });
+
+  it('wires import-x with the TypeScript resolver in the base block for every project', async () => {
+    const plainOutput = generateEslintConfig(BASE_INFO);
+    const expressOutput = generateEslintConfig({ ...BASE_INFO, framework: 'express' });
+    const config = await importGeneratedConfig(plainOutput);
+
+    for (const output of [plainOutput, expressOutput]) {
+      expect(output).toContain("import importX from 'eslint-plugin-import-x'");
+      expect(output).toContain(
+        "import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'",
+      );
+      expect(output).toContain("'import-x/no-cycle': 'warn'");
+      expect(output).toContain("'import-x/no-self-import': 'error'");
+    }
+    // Deliberately not enabled: these overlap with what tsc already
+    // guarantees via recommendedTypeChecked, and are prone to false
+    // positives on TS path aliases and monorepo workspace packages.
+    expect(plainOutput).not.toContain("'import-x/no-unresolved'");
+    expect(Array.isArray(config)).toBe(true);
+  });
 });
