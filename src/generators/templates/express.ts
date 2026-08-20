@@ -45,12 +45,12 @@ export function generateExpress(ctx: TemplateContext): TemplateResult {
     isMonorepo: false,
     packageJson: {
       dependencies: {
-        express: `^${expressVersion}`,
+        express: expressVersion,
       },
       devDependencies: {
-        '@types/express': `^${typesExpressVersion}`,
-        '@types/node': `^${typesNodeVersion}`,
-        typescript: `^${tsVersion}`,
+        '@types/express': typesExpressVersion,
+        '@types/node': typesNodeVersion,
+        typescript: tsVersion,
       },
       main: 'dist/index.js',
       name: ctx.projectName,

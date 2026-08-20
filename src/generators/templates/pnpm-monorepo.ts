@@ -68,8 +68,8 @@ function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string
   return JSON.stringify({
     dependencies: Object.keys(deps).length > 0 ? deps : undefined,
     devDependencies: {
-      '@types/node': `^${typesNodeVersion}`,
-      typescript: `^${tsVersion}`,
+      '@types/node': typesNodeVersion,
+      typescript: tsVersion,
     },
     main: 'dist/index.js',
     name,

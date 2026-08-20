@@ -4,8 +4,14 @@ vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));
 
+vi.mock('./logger.js', () => ({
+  warn: vi.fn(),
+}));
+
 const { execSync } = await import('node:child_process');
+const { warn } = await import('./logger.js');
 const mockedExecSync = vi.mocked(execSync);
+const mockedWarn = vi.mocked(warn);
 
 // versions.ts caches results in a module-level Map, so each test uses a
 // unique fake package name to avoid bleeding state across tests.
@@ -17,10 +23,15 @@ function uniquePkg(): string {
 
 beforeEach(() => {
   mockedExecSync.mockReset();
+  mockedWarn.mockReset();
+  // getTypescriptVersion always resolves the same hardcoded pinned spec, so
+  // without a fresh module instance per test its result would be cached
+  // by whichever test runs first, hiding the fallback path in later tests.
+  vi.resetModules();
 });
 
 describe('getVersions', () => {
-  it('resolves each package to a caret-prefixed version', async () => {
+  it('resolves each package to a caret-prefixed version without warning', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
     mockedExecSync.mockReturnValue('2.5.0\n');
@@ -31,9 +42,10 @@ describe('getVersions', () => {
     expect(mockedExecSync).toHaveBeenCalledWith(`npm view ${pkg} version`, {
       encoding: 'utf8',
     });
+    expect(mockedWarn).not.toHaveBeenCalled();
   });
 
-  it('produces an invalid "^*" range when the npm lookup fails', async () => {
+  it('falls back to the valid range "*" and warns when the npm lookup fails', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
     mockedExecSync.mockImplementation(() => {
@@ -42,14 +54,11 @@ describe('getVersions', () => {
 
     const result = getVersions([pkg]);
 
-    // getLatestVersion falls back to the bare string '*' on failure, but
-    // getVersions unconditionally wraps every result in `^${version}`,
-    // producing the literal string "^*" -- not a valid semver range. This
-    // means a network hiccup during `init`/`scaffold` writes a
-    // devDependency version that will make `npm install` fail outright,
-    // not one that silently installs "any version" as the raw '*' fallback
-    // in versions.ts might suggest.
-    expect(result).toEqual({ [pkg]: '^*' });
+    // A failed lookup must never be blindly wrapped in `^${...}` -- that
+    // used to produce the literal string "^*", an invalid semver range
+    // that makes `npm install` fail outright in the generated project.
+    expect(result).toEqual({ [pkg]: '*' });
+    expect(mockedWarn).toHaveBeenCalledWith(expect.stringContaining(pkg));
   });
 
   it('caches a resolved version instead of calling npm view again', async () => {
@@ -74,10 +83,17 @@ describe('getTypescriptVersion', () => {
     expect(mockedExecSync).toHaveBeenCalledWith('npm view typescript@6.0.3 version', {
       encoding: 'utf8',
     });
-    // Unlike getVersions/getToolchainDeps, getTypescriptVersion returns the
-    // bare version string -- callers (express.ts, plain.ts, etc.) prepend
-    // the "^" themselves.
-    expect(version).toBe('6.0.3');
+    expect(version).toBe('^6.0.3');
+  });
+
+  it('falls back to "*" and warns when the pinned lookup fails', async () => {
+    const { getTypescriptVersion } = await import('./versions.js');
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('network error');
+    });
+
+    expect(getTypescriptVersion()).toBe('*');
+    expect(mockedWarn).toHaveBeenCalledWith(expect.stringContaining('typescript@6.0.3'));
   });
 });
 

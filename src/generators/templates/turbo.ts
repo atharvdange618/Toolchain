@@ -54,7 +54,7 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
     isMonorepo: true,
     packageJson: {
       devDependencies: {
-        turbo: `^${turboVersion}`,
+        turbo: turboVersion,
       },
       name: ctx.projectName,
       packageManager: 'pnpm@9.0.0',
@@ -76,8 +76,8 @@ function pkgJson(name: string, opts?: { deps?: Record<string, string> }): string
   return JSON.stringify({
     dependencies: Object.keys(deps).length > 0 ? deps : undefined,
     devDependencies: {
-      '@types/node': `^${typesNodeVersion}`,
-      typescript: `^${tsVersion}`,
+      '@types/node': typesNodeVersion,
+      typescript: tsVersion,
     },
     main: 'dist/index.js',
     name,

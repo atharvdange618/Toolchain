@@ -29,7 +29,7 @@ console.log(greet('World'));
     isMonorepo: false,
     packageJson: {
       devDependencies: {
-        typescript: `^${tsVersion}`,
+        typescript: tsVersion,
       },
       main: 'dist/index.js',
       name: ctx.projectName,

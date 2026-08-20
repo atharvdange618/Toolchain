@@ -45,6 +45,17 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   }
 
   const existingDeps = (pkg['devDependencies'] as Record<string, string>) ?? {};
+  const depConflicts = Object.keys(devDeps).filter(
+    (key) => key in existingDeps && existingDeps[key] !== devDeps[key],
+  );
+  if (depConflicts.length > 0) {
+    warn(
+      `Overwriting existing devDependency versions: ${depConflicts
+        .map((key) => `${key} (${existingDeps[key]} -> ${devDeps[key]})`)
+        .join(', ')}`,
+    );
+  }
+
   pkg['devDependencies'] = preserveKeyOrder(existingDeps, devDeps);
 
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');

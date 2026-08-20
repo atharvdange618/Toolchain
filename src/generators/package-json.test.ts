@@ -116,7 +116,7 @@ describe('updatePackageJson', () => {
     expect(pkg['devDependencies']).toMatchObject({ '@next/eslint-plugin-next': '^15.0.0' });
   });
 
-  it('overwrites an existing devDependency version with the generated one, silently', () => {
+  it('warns and overwrites when an existing devDependency version differs from the generated one', () => {
     writeFileSync(
       path.join(dir, 'package.json'),
       JSON.stringify({ devDependencies: { eslint: '^8.0.0-pinned' }, name: 'my-app' }),
@@ -125,13 +125,20 @@ describe('updatePackageJson', () => {
     updatePackageJson(dir, BASE_INFO);
     const pkg = readPkg() as { devDependencies: Record<string, string> };
 
-    // Unlike scripts (which warn() on conflict), preserveKeyOrder overwrites
-    // any devDependency key that also appears in the generated set, and
-    // updatePackageJson never warns about it. This documents current
-    // behavior, not necessarily desired behavior — a project that pinned
-    // eslint to an older major loses that pin with no notice.
     expect(pkg.devDependencies['eslint']).toBe('^9.0.0');
     expect(pkg.devDependencies['prettier']).toBe('^3.0.0');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('eslint'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('^8.0.0-pinned'));
+  });
+
+  it('does not warn when an existing devDependency version already matches the generated one', () => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ devDependencies: { eslint: '^9.0.0' }, name: 'my-app' }),
+    );
+
+    updatePackageJson(dir, BASE_INFO);
+
     expect(warn).not.toHaveBeenCalled();
   });
 });
