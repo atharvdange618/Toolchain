@@ -18,6 +18,11 @@ import { writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
 export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
+  if (options.pm && !VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
+    error(`Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`);
+    process.exit(1);
+  }
+
   const targetDir = options.targetDir ?? process.cwd();
 
   step(1, 'Detecting project environment...');
@@ -80,10 +85,7 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   }
   success('package.json updated with scripts, lint-staged, and devDependencies');
 
-  const pm: PackageManager =
-    options.pm && VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)
-      ? (options.pm as PackageManager)
-      : projectInfo.packageManager;
+  const pm: PackageManager = (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
 
   step(7, `Installing dependencies with ${pm}...`);
   try {
