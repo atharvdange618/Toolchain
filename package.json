@@ -16,7 +16,7 @@
   "author": "Atharv Dange",
   "type": "module",
   "bin": {
-    "toolchain": "./bin/index.js"
+    "toolchain": "bin/index.js"
   },
   "files": [
     "bin/",
