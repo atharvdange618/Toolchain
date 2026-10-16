@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import prompts from 'prompts';
 
@@ -16,6 +16,24 @@ import {
 import { generateTsconfig } from '../generators/tsconfig.js';
 import { writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
+
+// ESLint loads eslint.config.js before eslint.config.mjs, so a leftover .js
+// (create-vite ships one) silently replaces ours. The rest never shadow it
+// but would leave a second config that does nothing. ESLint 9 ignores
+// .eslintrc.* entirely.
+const OTHER_ESLINT_CONFIGS = [
+  'eslint.config.js',
+  'eslint.config.cjs',
+  'eslint.config.ts',
+  'eslint.config.mts',
+  'eslint.config.cts',
+  '.eslintrc',
+  '.eslintrc.js',
+  '.eslintrc.cjs',
+  '.eslintrc.json',
+  '.eslintrc.yaml',
+  '.eslintrc.yml',
+];
 
 export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
   if (options.pm && !VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
@@ -57,6 +75,12 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('commitlint.config.js');
 
   step(3, 'Generating ESLint config...');
+  for (const name of OTHER_ESLINT_CONFIGS) {
+    const file = path.join(targetDir, name);
+    if (!existsSync(file)) continue;
+    renameSync(file, `${file}.bak`);
+    warn(`Moved ${name} to ${name}.bak so eslint.config.mjs takes effect`);
+  }
   const eslintConfig = generateEslintConfig(projectInfo);
   writeFile(path.join(targetDir, 'eslint.config.mjs'), eslintConfig);
   success('eslint.config.mjs');

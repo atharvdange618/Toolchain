@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,5 +49,24 @@ describe('init package manager', () => {
     const preCommit = readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8');
     expect(preCommit).toBe('yarn exec lint-staged\nyarn run typecheck\n');
     expect(execSync).toHaveBeenCalledWith('yarn install', expect.anything());
+  });
+});
+
+describe('init with an existing project setup', () => {
+  it('moves a shadowing eslint.config.js and legacy .eslintrc aside, keeping their contents', async () => {
+    writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    writeFileSync(path.join(dir, '.eslintrc.json'), '{}\n');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(false);
+    expect(existsSync(path.join(dir, '.eslintrc.json'))).toBe(false);
+    expect(readFileSync(path.join(dir, 'eslint.config.js.bak'), 'utf8')).toBe('export default [];\n');
+    expect(readFileSync(path.join(dir, '.eslintrc.json.bak'), 'utf8')).toBe('{}\n');
+    expect(existsSync(path.join(dir, 'eslint.config.mjs'))).toBe(true);
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining('Moved eslint.config.js to eslint.config.js.bak'),
+    );
   });
 });
