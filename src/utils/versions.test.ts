@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({
@@ -64,25 +65,14 @@ describe('getVersions', () => {
 });
 
 describe('getTypescriptVersion', () => {
-  it('pins to the typescript@6.0.3 spec for typescript-eslint compatibility', async () => {
+  it('allows 6.0.x patches but never 6.1+, which typescript-eslint rejects', async () => {
     const { getTypescriptVersion } = await import('./versions.js');
-    mockedExecSync.mockReturnValue('6.0.3\n');
 
-    const version = getTypescriptVersion();
+    const range = getTypescriptVersion();
 
-    expect(mockedExecSync).toHaveBeenCalledWith('npm view typescript@6.0.3 version', {
-      encoding: 'utf8',
-    });
-    expect(version).toBe('^6.0.3');
-  });
-
-  it('throws when the pinned lookup fails', async () => {
-    const { getTypescriptVersion } = await import('./versions.js');
-    mockedExecSync.mockImplementation(() => {
-      throw new Error('network error');
-    });
-
-    expect(() => getTypescriptVersion()).toThrow('typescript@6.0.3');
+    expect(semver.satisfies('6.0.9', range)).toBe(true);
+    expect(semver.satisfies('6.1.0', range)).toBe(false);
+    expect(mockedExecSync).not.toHaveBeenCalled();
   });
 });
 

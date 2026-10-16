@@ -74,8 +74,9 @@ export function getTurboVersion(): string {
 }
 
 export function getTypescriptVersion(): string {
-  // typescript-eslint requires <6.1.0, so pin to latest 6.0.x
-  return toRange('typescript@6.0.3');
+  // typescript-eslint requires <6.1.0. A tilde range keeps installs on
+  // 6.0.x, where a caret range would let 6.1+ in.
+  return '~6.0.3';
 }
 
 export function getTypesExpressVersion(): string {
