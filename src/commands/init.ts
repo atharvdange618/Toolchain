@@ -27,8 +27,10 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
 
   step(1, 'Detecting project environment...');
   const projectInfo = detect(targetDir);
+  // Resolved once so the hooks and the install can't disagree.
+  const pm: PackageManager = (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
   info(`Framework: ${projectInfo.framework}`);
-  info(`Package manager: ${projectInfo.packageManager}`);
+  info(`Package manager: ${pm}`);
   info(`Monorepo: ${projectInfo.isMonorepo ? 'Yes' : 'No'}`);
 
   if (!options.yes) {
@@ -70,7 +72,7 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   }
 
   step(5, 'Writing Husky hooks...');
-  writeHuskyHooks(targetDir, projectInfo.packageManager);
+  writeHuskyHooks(targetDir, pm);
   success('.husky/pre-commit');
   success('.husky/commit-msg');
 
@@ -84,8 +86,6 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
     process.exit(1);
   }
   success('package.json updated with scripts, lint-staged, and devDependencies');
-
-  const pm: PackageManager = (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
 
   step(7, `Installing dependencies with ${pm}...`);
   try {
