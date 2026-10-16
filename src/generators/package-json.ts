@@ -31,13 +31,16 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   const pkgPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
 
+  // -b follows project references; --noEmit keeps it from writing output.
+  const scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b --noEmit' } : SCRIPTS;
+
   const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};
-  const conflicts = Object.keys(SCRIPTS).filter((key) => key in existingScripts);
+  const conflicts = Object.keys(scripts).filter((key) => key in existingScripts);
   if (conflicts.length > 0) {
     warn(`Overwriting existing scripts: ${conflicts.join(', ')}`);
   }
 
-  pkg['scripts'] = preserveKeyOrder(existingScripts, SCRIPTS);
+  pkg['scripts'] = preserveKeyOrder(existingScripts, scripts);
   pkg['lint-staged'] = LINT_STAGED;
 
   const existingConfig = (pkg['config'] as Record<string, unknown>) ?? {};

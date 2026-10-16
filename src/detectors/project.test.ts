@@ -146,3 +146,28 @@ describe('pmExec', () => {
     expect(pmExec('yarn')).toBe('yarn exec');
   });
 });
+
+describe('detect project references', () => {
+  it('flags a create-vite style tsconfig, comments and all', () => {
+    writePackageJson({});
+    writeFileSync(
+      path.join(dir, 'tsconfig.json'),
+      '{\n  // solution-style root\n  "files": [],\n  "references": [\n    { "path": "./tsconfig.app.json" }\n  ]\n}\n',
+    );
+
+    expect(detect(dir).hasProjectReferences).toBe(true);
+  });
+
+  it('ignores an empty references array like the monorepo tsconfig we generate', () => {
+    writePackageJson({});
+    writeFileSync(path.join(dir, 'tsconfig.json'), '{ "compilerOptions": {}, "references": [] }');
+
+    expect(detect(dir).hasProjectReferences).toBe(false);
+  });
+
+  it('is false when there is no tsconfig.json', () => {
+    writePackageJson({});
+
+    expect(detect(dir).hasProjectReferences).toBe(false);
+  });
+});

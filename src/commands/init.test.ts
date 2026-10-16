@@ -69,4 +69,18 @@ describe('init with an existing project setup', () => {
       expect.stringContaining('Moved eslint.config.js to eslint.config.js.bak'),
     );
   });
+
+  it('writes a tsc -b typecheck script for a tsconfig with references', async () => {
+    writeFileSync(
+      path.join(dir, 'tsconfig.json'),
+      '{ "files": [], "references": [{ "path": "./tsconfig.app.json" }] }',
+    );
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts['typecheck']).toBe('tsc -b --noEmit');
+  });
 });

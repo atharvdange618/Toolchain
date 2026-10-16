@@ -16,6 +16,7 @@ const PRETTIER_OPTIONS = {
 
 const BASE_INFO: ProjectInfo = {
   framework: 'plain',
+  hasProjectReferences: false,
   hasReact: false,
   isMonorepo: false,
   packageManager: 'pnpm',

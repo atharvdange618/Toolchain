@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { readJson } from '../utils/fs.js';
@@ -10,6 +10,7 @@ export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ['bun', 'npm', 
 
 export interface ProjectInfo {
   framework: Framework;
+  hasProjectReferences: boolean;
   hasReact: boolean;
   isMonorepo: boolean;
   packageManager: PackageManager;
@@ -26,6 +27,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
   const allDeps = getAllDeps(pkg);
   return {
     framework: detectFramework(allDeps),
+    hasProjectReferences: detectProjectReferences(dir),
     hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
     isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
@@ -68,6 +70,20 @@ function detectPackageManager(dir: string, pkg: Record<string, unknown>): Packag
   if (pmConfig?.['name'] === 'bun') return 'bun';
 
   return 'npm';
+}
+
+// A root tsconfig with references (create-vite's has "files": [] plus
+// references) type-checks nothing under plain tsc --noEmit; only tsc -b
+// follows the references. An empty array, as our monorepo tsconfig ships,
+// doesn't count.
+// ponytail: regex over the raw text because tsconfig is JSONC and
+// JSON.parse rejects comments. A commented-out references entry gives a
+// false positive; switch to typescript's parseConfigFileTextToJson if that
+// ever matters.
+function detectProjectReferences(dir: string): boolean {
+  const tsconfigPath = path.join(dir, 'tsconfig.json');
+  if (!existsSync(tsconfigPath)) return false;
+  return /"references"\s*:\s*\[\s*\{/.test(readFileSync(tsconfigPath, 'utf8'));
 }
 
 function getAllDeps(pkg: Record<string, unknown>): Record<string, string> {

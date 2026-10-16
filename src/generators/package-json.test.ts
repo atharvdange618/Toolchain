@@ -29,6 +29,7 @@ const { warn } = await import('../utils/logger.js');
 
 const BASE_INFO: ProjectInfo = {
   framework: 'plain',
+  hasProjectReferences: false,
   hasReact: false,
   isMonorepo: false,
   packageManager: 'pnpm',
@@ -66,6 +67,14 @@ describe('updatePackageJson', () => {
     });
     expect(pkg['lint-staged']).toBeDefined();
     expect(pkg['devDependencies']).toMatchObject({ eslint: '^9.0.0', prettier: '^3.0.0' });
+  });
+
+  it('uses tsc -b for typecheck when the tsconfig has project references', () => {
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
+
+    updatePackageJson(dir, { ...BASE_INFO, hasProjectReferences: true });
+
+    expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc -b --noEmit' });
   });
 
   it('wires up commitizen to read prompts from the generated commitlint config', () => {
