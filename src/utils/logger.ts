@@ -1,7 +1,7 @@
 import pc from 'picocolors';
 
 export function error(msg: string): void {
-  process.stdout.write(`${pc.red('✖')} ${msg}\n`);
+  process.stderr.write(`${pc.red('✖')} ${msg}\n`);
 }
 
 export function info(msg: string): void {

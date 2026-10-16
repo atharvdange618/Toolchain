@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { init } from './commands/init.js';
 import { scaffold } from './commands/scaffold.js';
 import { TEMPLATES } from './generators/templates/index.js';
+import { error } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,4 +38,11 @@ program
   .option('--yes', 'Skip prompts and use defaults')
   .action(scaffold);
 
-program.parse();
+// parseAsync so a rejected async action lands here as a one-line message
+// instead of an unhandled rejection with a stack trace.
+try {
+  await program.parseAsync();
+} catch (error_) {
+  error(error_ instanceof Error ? error_.message : String(error_));
+  process.exit(1);
+}
