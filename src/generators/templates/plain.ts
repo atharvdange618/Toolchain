@@ -1,6 +1,7 @@
 import type { TemplateContext, TemplateResult } from './index.js';
 
 import { getTypescriptVersion } from '../../utils/versions.js';
+import { generateTsconfig } from '../tsconfig.js';
 
 const GITIGNORE = `node_modules/
 dist/
@@ -23,6 +24,7 @@ console.log(greet('World'));
         path: 'src/index.ts',
       },
       { content: GITIGNORE, path: '.gitignore' },
+      { content: generateTsconfig({ isMonorepo: false, nodeApp: true }), path: 'tsconfig.json' },
     ],
     framework: 'plain',
     hasReact: false,

@@ -1,6 +1,7 @@
 import type { TemplateContext, TemplateResult } from './index.js';
 
 import { getExpressVersion, getTypescriptVersion, getTypesExpressVersion, getTypesNodeVersion } from '../../utils/versions.js';
+import { generateTsconfig } from '../tsconfig.js';
 
 const GITIGNORE = `node_modules/
 dist/
@@ -39,6 +40,7 @@ export function generateExpress(ctx: TemplateContext): TemplateResult {
     files: [
       { content: EXPRESS_ENTRY, path: 'src/index.ts' },
       { content: GITIGNORE, path: '.gitignore' },
+      { content: generateTsconfig({ isMonorepo: false, nodeApp: true }), path: 'tsconfig.json' },
     ],
     framework: 'express',
     hasReact: false,
