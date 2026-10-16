@@ -57,16 +57,20 @@ export function getExpressVersion(): string {
 }
 
 export function getToolchainDeps(): Record<string, string> {
-  return getVersions([
-    '@commitlint/cli',
-    '@commitlint/config-conventional',
-    '@commitlint/cz-commitlint',
-    'commitizen',
-    'eslint-import-resolver-typescript',
-    'husky',
-    'lint-staged',
-    'prettier',
-  ]);
+  return {
+    ...getVersions([
+      '@commitlint/cli',
+      '@commitlint/config-conventional',
+      '@commitlint/cz-commitlint',
+      'commitizen',
+      'eslint-import-resolver-typescript',
+      'husky',
+      'lint-staged',
+      'prettier',
+    ]),
+    // The generated typecheck script and typescript-eslint both need it.
+    typescript: getTypescriptVersion(),
+  };
 }
 
 export function getTurboVersion(): string {

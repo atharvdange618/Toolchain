@@ -98,9 +98,13 @@ describe('getToolchainDeps', () => {
     expect(deps).not.toHaveProperty('eslint');
     expect(deps).not.toHaveProperty('typescript-eslint');
     expect(deps).not.toHaveProperty('eslint-plugin-import-x');
-    for (const version of Object.values(deps)) {
+    const { typescript, ...rest } = deps;
+    for (const version of Object.values(rest)) {
       expect(version).toBe('^9.9.9');
     }
+    // Without it, a JS project gets a typecheck script and pre-commit hook
+    // that fail with "tsc not found".
+    expect(typescript).toBe('~6.0.3');
   });
 
   it('throws on the first package that fails to resolve', async () => {
