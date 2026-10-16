@@ -26,7 +26,11 @@ describe('generateTsconfig', () => {
     const output = generateTsconfig({ isMonorepo: true });
     const parsed = JSON.parse(output) as Record<string, unknown>;
 
-    expect(parsed['composite']).toBe(true);
+    const compilerOptions = parsed['compilerOptions'] as Record<string, unknown>;
+
+    // composite is a compiler option; tsc ignores it at the top level.
+    expect(compilerOptions['composite']).toBe(true);
+    expect(parsed['composite']).toBeUndefined();
     expect(parsed['references']).toEqual([]);
   });
 

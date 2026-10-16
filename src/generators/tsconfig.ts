@@ -31,7 +31,7 @@ const COMPILER_OPTIONS = {
 
 export function generateTsconfig({ isMonorepo }: TsconfigOptions): string {
   const config = isMonorepo
-    ? { compilerOptions: COMPILER_OPTIONS, composite: true, references: [] }
+    ? { compilerOptions: { ...COMPILER_OPTIONS, composite: true }, references: [] }
     : { compilerOptions: COMPILER_OPTIONS };
   return JSON.stringify(config, null, 2) + '\n';
 }
