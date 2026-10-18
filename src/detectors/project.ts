@@ -38,6 +38,19 @@ export function pmExec(pm: PackageManager): string {
   return pm === 'bun' ? 'bun run' : `${pm} exec`;
 }
 
+// Runs a package that isn't installed yet. npx needs --yes to skip its
+// "Ok to proceed?" install prompt; the others don't ask. yarn dlx is Yarn 2+.
+const DLX: Record<PackageManager, string> = {
+  bun: 'bunx',
+  npm: 'npx --yes',
+  pnpm: 'pnpm dlx',
+  yarn: 'yarn dlx',
+};
+
+export function pmDlx(pm: PackageManager): string {
+  return DLX[pm];
+}
+
 function detectFramework(allDeps: Record<string, string>): Framework {
   if (allDeps['next']) return 'next';
   if (allDeps['express']) return 'express';

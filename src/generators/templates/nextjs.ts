@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { TemplateContext, TemplateResult } from './index.js';
 
+import { pmDlx } from '../../detectors/project.js';
+
 export function generateNextjs(_ctx: TemplateContext): TemplateResult {
   return {
     files: [],
@@ -15,14 +17,15 @@ export function generateNextjs(_ctx: TemplateContext): TemplateResult {
 }
 
 function scaffoldNextjs(ctx: TemplateContext): void {
-  const { packageManager: pm, projectName, targetDir } = ctx;
+  const { packageManager: pm, projectName, targetDir, yes } = ctx;
 
-  // create-next-app expects npx even with pnpm
-  const npx = pm === 'npm' ? 'npx' : `${pm} exec npx`;
+  // --yes fills unasked options from saved preferences, so pin the ones this
+  // template promises (TypeScript, App Router) rather than trust the machine.
+  const flags = yes ? ' --ts --app --yes' : '';
 
   // Run from parent directory since create-next-app creates the folder
   const parentDir = path.dirname(targetDir);
-  execSync(`${npx} --yes create-next-app@latest ${projectName} --use-${pm}`, {
+  execSync(`${pmDlx(pm)} create-next-app@latest ${projectName} --use-${pm}${flags}`, {
     cwd: parentDir,
     stdio: 'inherit',
   });

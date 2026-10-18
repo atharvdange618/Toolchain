@@ -17,7 +17,7 @@ vi.mock('../../utils/versions.js', () => ({
 const { generateExpress } = await import('./express.js');
 const { generatePlain } = await import('./plain.js');
 
-const ctx = { packageManager: 'pnpm' as const, projectName: 'demo', targetDir: '' };
+const ctx = { packageManager: 'pnpm' as const, projectName: 'demo', targetDir: '', yes: true };
 const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
 
 let dir: string | undefined;

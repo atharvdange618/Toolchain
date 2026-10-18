@@ -119,6 +119,7 @@ export async function scaffold(
     packageManager: pm,
     projectName,
     targetDir,
+    yes: options.yes === true,
   };
 
   const generator = GENERATORS[template];

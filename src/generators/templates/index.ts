@@ -24,6 +24,7 @@ export interface TemplateContext {
   packageManager: PackageManager;
   projectName: string;
   targetDir: string;
+  yes: boolean;
 }
 
 export interface TemplateResult {

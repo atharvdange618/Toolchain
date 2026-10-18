@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { TemplateContext, TemplateResult } from './index.js';
 
+import { pmDlx } from '../../detectors/project.js';
+
 export function generateReact(_ctx: TemplateContext): TemplateResult {
   return {
     files: [],
@@ -15,14 +17,16 @@ export function generateReact(_ctx: TemplateContext): TemplateResult {
 }
 
 function scaffoldReact(ctx: TemplateContext): void {
-  const { packageManager: pm, projectName, targetDir } = ctx;
+  const { packageManager: pm, projectName, targetDir, yes } = ctx;
 
-  // Use npx create-vite directly for reliable non-interactive scaffolding
-  const npx = pm === 'npm' ? 'npx' : `${pm} exec npx`;
+  // --no-immediate always: otherwise create-vite may install and start a dev
+  // server that never exits, so init would never run. In a TTY it prompts
+  // unless told --no-interactive.
+  const flags = yes ? ' --no-interactive' : '';
 
   // create-vite creates the directory itself, so run from parent
   const parentDir = path.dirname(targetDir);
-  execSync(`${npx} --yes create-vite@latest ${projectName} --template react-ts`, {
+  execSync(`${pmDlx(pm)} create-vite@latest ${projectName} --template react-ts --no-immediate${flags}`, {
     cwd: parentDir,
     stdio: 'inherit',
   });
