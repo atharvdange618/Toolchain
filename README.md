@@ -61,7 +61,7 @@ pnpm dlx @atharvdange/toolchain scaffold my-app
 
 Use `--pm` to specify the package manager: `npm`, `pnpm`, `yarn`, or `bun`.
 
-> **Note:** React and Next.js projects use their official scaffolding tools (`create-vite` and `create-next-app`), then the toolchain is added on top.
+> **Note:** React and Next.js projects use their official scaffolding tools (`create-vite` and `create-next-app`), then the toolchain is added on top. With `--yes`, those tools run without prompts: Vite gets the `react-ts` template, Next.js gets TypeScript and the App Router, and other choices fall back to the tool's defaults. These templates run the tool through `npx`, `pnpm dlx`, `yarn dlx` (Yarn 2+), or `bunx`.
 
 > **Note:** `pnpm-monorepo` template requires `pnpm` and will override `--pm` if set to a different package manager.
 
