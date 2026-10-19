@@ -81,7 +81,7 @@ describe('init with an existing project setup', () => {
     const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>;
     };
-    expect(pkg.scripts['typecheck']).toBe('tsc -b --noEmit');
+    expect(pkg.scripts['typecheck']).toBe('tsc -b');
   });
 });
 

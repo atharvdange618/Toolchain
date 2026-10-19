@@ -31,8 +31,10 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   const pkgPath = path.join(targetDir, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
 
-  // -b follows project references; --noEmit keeps it from writing output.
-  const scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b --noEmit' } : SCRIPTS;
+  // -b follows project references. No --noEmit: a project another one
+  // references must emit (TS6310), and solution configs like create-vite's
+  // already set noEmit per project.
+  const scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b' } : SCRIPTS;
 
   const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};
   const conflicts = Object.keys(scripts).filter((key) => key in existingScripts);

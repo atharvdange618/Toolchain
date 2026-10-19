@@ -12,6 +12,9 @@ export function generateMonorepoPackageFiles(
   devScript: string,
 ): Array<{ content: string; path: string }> {
   return [
+    // Solution-style root: init sees the references and typechecks with
+    // tsc -b, which builds each package against its own tsconfig.
+    { content: rootTsconfig(), path: 'tsconfig.json' },
     {
       content: monorepoPkgJson('@repo/web', devScript, {
         '@repo/config': 'workspace:*',
@@ -144,4 +147,17 @@ function monorepoPkgJson(name: string, devScript: string, deps?: Record<string, 
       2,
     ) + '\n'
   );
+}
+
+function rootTsconfig(): string {
+  const packages = [
+    'apps/web',
+    'apps/mobile',
+    'apps/api',
+    'packages/shared',
+    'packages/config',
+    'packages/db',
+  ];
+  const config = { files: [], references: packages.map((dir) => ({ path: dir })) };
+  return JSON.stringify(config, null, 2) + '\n';
 }

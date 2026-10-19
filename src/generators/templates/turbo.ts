@@ -5,6 +5,7 @@ import { generateMonorepoPackageFiles, PNPM_WORKSPACE } from './monorepo-shared.
 
 const GITIGNORE = `node_modules/
 dist/
+*.tsbuildinfo
 *.tgz
 .env
 .env.local

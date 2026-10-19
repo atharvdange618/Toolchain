@@ -74,7 +74,7 @@ describe('updatePackageJson', () => {
 
     updatePackageJson(dir, { ...BASE_INFO, hasProjectReferences: true });
 
-    expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc -b --noEmit' });
+    expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc -b' });
   });
 
   it('wires up commitizen to read prompts from the generated commitlint config', () => {
