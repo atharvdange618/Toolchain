@@ -137,3 +137,21 @@ describe('init pnpm build approval', () => {
     expect(existsSync(workspaceFile())).toBe(false);
   });
 });
+
+describe('init with conflicting commitlint configs', () => {
+  // commitlint loads .commitlintrc* and commitlint.config.js before our .mjs,
+  // so a leftover one (e.g. the CommonJS file older versions wrote) wins.
+  it('moves shadowing commitlint configs aside, keeping their contents', async () => {
+    writeFileSync(path.join(dir, 'commitlint.config.js'), 'module.exports = {};\n');
+    writeFileSync(path.join(dir, '.commitlintrc.json'), '{}\n');
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'commitlint.config.js'))).toBe(false);
+    expect(readFileSync(path.join(dir, 'commitlint.config.js.bak'), 'utf8')).toBe(
+      'module.exports = {};\n',
+    );
+    expect(readFileSync(path.join(dir, '.commitlintrc.json.bak'), 'utf8')).toBe('{}\n');
+    expect(existsSync(path.join(dir, 'commitlint.config.mjs'))).toBe(true);
+  });
+});

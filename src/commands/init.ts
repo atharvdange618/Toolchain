@@ -35,6 +35,22 @@ const OTHER_ESLINT_CONFIGS = [
   '.eslintrc.yml',
 ];
 
+// commitlint loads all of these before commitlint.config.mjs, including the
+// CommonJS commitlint.config.js older versions of this tool wrote.
+const OTHER_COMMITLINT_CONFIGS = [
+  '.commitlintrc',
+  '.commitlintrc.json',
+  '.commitlintrc.yaml',
+  '.commitlintrc.yml',
+  '.commitlintrc.js',
+  '.commitlintrc.cjs',
+  '.commitlintrc.mjs',
+  '.commitlintrc.ts',
+  '.commitlintrc.cts',
+  'commitlint.config.js',
+  'commitlint.config.cjs',
+];
+
 export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
   if (options.pm && !VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
     error(`Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`);
@@ -71,16 +87,12 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('.prettierrc');
   writeFile(path.join(targetDir, '.prettierignore'), PRETTIERIGNORE);
   success('.prettierignore');
+  moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
   writeFile(path.join(targetDir, 'commitlint.config.mjs'), COMMITLINT_CONFIG);
   success('commitlint.config.mjs');
 
   step(3, 'Generating ESLint config...');
-  for (const name of OTHER_ESLINT_CONFIGS) {
-    const file = path.join(targetDir, name);
-    if (!existsSync(file)) continue;
-    renameSync(file, `${file}.bak`);
-    warn(`Moved ${name} to ${name}.bak so eslint.config.mjs takes effect`);
-  }
+  moveAside(targetDir, OTHER_ESLINT_CONFIGS, 'eslint.config.mjs');
   const eslintConfig = generateEslintConfig(projectInfo);
   writeFile(path.join(targetDir, 'eslint.config.mjs'), eslintConfig);
   success('eslint.config.mjs');
@@ -154,4 +166,14 @@ function allowPnpmBuilds(targetDir: string): void {
     : `${yaml}${yaml === '' || yaml.endsWith('\n') ? '' : '\n'}allowBuilds:\n${entry}`;
   writeFile(file, updated);
   success('pnpm-workspace.yaml allows the unrs-resolver build');
+}
+
+// Renames rather than deletes, so the user keeps any custom rules.
+function moveAside(targetDir: string, names: string[], ours: string): void {
+  for (const name of names) {
+    const file = path.join(targetDir, name);
+    if (!existsSync(file)) continue;
+    renameSync(file, `${file}.bak`);
+    warn(`Moved ${name} to ${name}.bak so ${ours} takes effect`);
+  }
 }
