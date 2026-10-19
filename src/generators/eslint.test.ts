@@ -39,7 +39,9 @@ async function importGeneratedConfig(source: string): Promise<unknown> {
   }
 }
 
-describe('generateEslintConfig', () => {
+// A cold import of the generated config (typescript-eslint and friends) can
+// take 10s+ when test files run in parallel.
+describe('generateEslintConfig', { timeout: 30_000 }, () => {
   it('generates a config that is valid, importable JS for a plain project', async () => {
     const output = generateEslintConfig(BASE_INFO);
     const config = await importGeneratedConfig(output);
