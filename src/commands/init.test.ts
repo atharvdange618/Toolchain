@@ -168,3 +168,18 @@ describe('init with a create-vite oxlint setup', () => {
     expect(readFileSync(path.join(dir, '.oxlintrc.json.bak'), 'utf8')).toBe('{}\n');
   });
 });
+
+describe('init with an inline allowBuilds map', () => {
+  // A line-based edit can't extend `allowBuilds: { ... }` safely; appending
+  // a block would add a second allowBuilds key, which is invalid YAML.
+  it('leaves the file alone and tells the user what to add', async () => {
+    const yaml = 'allowBuilds: { esbuild: true }\n';
+    writeFileSync(path.join(dir, 'pnpm-workspace.yaml'), yaml);
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(path.join(dir, 'pnpm-workspace.yaml'), 'utf8')).toBe(yaml);
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining('unrs-resolver: true'));
+  });
+});

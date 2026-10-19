@@ -155,11 +155,15 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
 // pnpm 11 fails the install when a dependency's build script isn't approved,
 // and eslint-import-resolver-typescript pulls in unrs-resolver, which has one.
 // ponytail: line-based edit, not a YAML parser. An inline `allowBuilds: {...}`
-// map would get a second allowBuilds key; parse with a YAML lib if that shows up.
+// map gets a warning instead; parse with a YAML lib if that comes up often.
 function allowPnpmBuilds(targetDir: string): void {
   const file = path.join(targetDir, 'pnpm-workspace.yaml');
   const yaml = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  if (/^\s+unrs-resolver:/m.test(yaml)) return;
+  if (/unrs-resolver:/.test(yaml)) return;
+  if (/^allowBuilds:[ \t]*\S/m.test(yaml)) {
+    warn('pnpm-workspace.yaml has an inline allowBuilds map. Add "unrs-resolver: true" to it, or pnpm 11 will refuse to install.');
+    return;
+  }
 
   const entry = '  unrs-resolver: true\n';
   const header = /^allowBuilds:[ \t]*\n/m;
