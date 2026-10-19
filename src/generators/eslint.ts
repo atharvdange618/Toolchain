@@ -35,6 +35,8 @@ ${items}
 
 const UNICORN_RULES = `
       'unicorn/prevent-abbreviations': 'off',
+      'unicorn/name-replacements': 'off',
+      'unicorn/no-top-level-side-effects': 'off',
       'unicorn/no-null': 'off',
       'unicorn/filename-case': 'off',
       'unicorn/no-array-reduce': 'off',
@@ -100,7 +102,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';`);
     '  js.configs.recommended,',
     '  ...tseslint.configs.recommended,',
     typeCheckedConfig,
-    `  unicorn.configs['flat/recommended'],`,
+    '  unicorn.configs.recommended,',
     "  perfectionist.configs['recommended-alphabetical'],",
     `  {
     files: ['**/*.ts', '**/*.tsx'],${info.isMonorepo ? '' : '\n    languageOptions: { parserOptions: { projectService: true } },'}

@@ -49,6 +49,26 @@ describe('generateEslintConfig', { timeout: 30_000 }, () => {
     expect(Array.isArray(config)).toBe(true);
   });
 
+  // The repo's own unicorn (v64) still ships the deprecated 'flat/recommended'
+  // alias, so the import test above can't catch it. The latest unicorn the
+  // resolver installs (v78+) dropped it, leaving undefined in the config array.
+  it('uses the unicorn config key that every supported unicorn version exports', () => {
+    const output = generateEslintConfig(BASE_INFO);
+
+    expect(output).toContain('unicorn.configs.recommended,');
+    expect(output).not.toContain("unicorn.configs['flat/");
+  });
+
+  // unicorn v78 renamed prevent-abbreviations to name-replacements and added
+  // no-top-level-side-effects, which flags every app entry file.
+  it('turns off unicorn rules that fight normal app code across versions', () => {
+    const output = generateEslintConfig(BASE_INFO);
+
+    expect(output).toContain("'unicorn/prevent-abbreviations': 'off'");
+    expect(output).toContain("'unicorn/name-replacements': 'off'");
+    expect(output).toContain("'unicorn/no-top-level-side-effects': 'off'");
+  });
+
   it('includes recommendedTypeChecked and projectService for a single-package project', () => {
     const output = generateEslintConfig(BASE_INFO);
 
