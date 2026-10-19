@@ -63,9 +63,10 @@ function detectFramework(allDeps: Record<string, string>): Framework {
 function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {
   // Check for workspaces key in package.json (npm/yarn)
   if ('workspaces' in pkg) return true;
-  // Check for pnpm-workspace.yaml (modern pnpm)
-  if (existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return true;
-  return false;
+  // Check pnpm-workspace.yaml for a packages list. The file alone isn't
+  // enough: init writes pnpm settings (allowBuilds) into it for any project.
+  const workspaceFile = path.join(dir, 'pnpm-workspace.yaml');
+  return existsSync(workspaceFile) && /^packages:/m.test(readFileSync(workspaceFile, 'utf8'));
 }
 
 function detectPackageManager(dir: string, pkg: Record<string, unknown>): PackageManager {

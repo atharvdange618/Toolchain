@@ -103,3 +103,37 @@ describe('init git hooks and commitlint', () => {
     expect(config).not.toContain('module.exports');
   });
 });
+
+describe('init pnpm build approval', () => {
+  const workspaceFile = (): string => path.join(dir, 'pnpm-workspace.yaml');
+
+  it('approves the unrs-resolver build so pnpm 11 install does not fail', async () => {
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(workspaceFile(), 'utf8')).toBe('allowBuilds:\n  unrs-resolver: true\n');
+  });
+
+  it('adds to an existing workspace file without touching its other keys', async () => {
+    writeFileSync(workspaceFile(), 'packages:\n  - "apps/*"\nallowBuilds:\n  esbuild: true\n');
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(workspaceFile(), 'utf8')).toBe(
+      'packages:\n  - "apps/*"\nallowBuilds:\n  unrs-resolver: true\n  esbuild: true\n',
+    );
+  });
+
+  it('leaves an existing unrs-resolver entry alone', async () => {
+    writeFileSync(workspaceFile(), 'allowBuilds:\n  unrs-resolver: false\n');
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(workspaceFile(), 'utf8')).toBe('allowBuilds:\n  unrs-resolver: false\n');
+  });
+
+  it('writes no workspace file for other package managers', async () => {
+    await init({ pm: 'npm', targetDir: dir, yes: true });
+
+    expect(existsSync(workspaceFile())).toBe(false);
+  });
+});

@@ -82,9 +82,18 @@ describe('detect', () => {
 
   it('detects a monorepo via pnpm-workspace.yaml', () => {
     writePackageJson({});
-    touch('pnpm-workspace.yaml');
+    writeFileSync(path.join(dir, 'pnpm-workspace.yaml'), 'packages:\n  - "packages/*"\n');
 
     expect(detect(dir).isMonorepo).toBe(true);
+  });
+
+  // init writes allowBuilds into pnpm-workspace.yaml for single-package pnpm
+  // projects, so the file alone can't mean "monorepo".
+  it('is not a monorepo when pnpm-workspace.yaml only holds settings', () => {
+    writePackageJson({});
+    writeFileSync(path.join(dir, 'pnpm-workspace.yaml'), 'allowBuilds:\n  unrs-resolver: true\n');
+
+    expect(detect(dir).isMonorepo).toBe(false);
   });
 
   it('is not a monorepo when neither signal is present', () => {
