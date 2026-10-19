@@ -35,7 +35,9 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
 }
 
 export function pmExec(pm: PackageManager): string {
-  return pm === 'bun' ? 'bun run' : `${pm} exec`;
+  if (pm === 'bun') return 'bun run';
+  // Without -- npm reads the command's flags as its own (e.g. --edit).
+  return pm === 'npm' ? 'npm exec --' : `${pm} exec`;
 }
 
 // Runs a package that isn't installed yet. npx needs --yes to skip its

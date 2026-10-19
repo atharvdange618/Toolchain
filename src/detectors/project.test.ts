@@ -140,8 +140,13 @@ describe('pmExec', () => {
     expect(pmExec('bun')).toBe('bun run');
   });
 
-  it('uses "<pm> exec" for everything else', () => {
-    expect(pmExec('npm')).toBe('npm exec');
+  // Without -- npm parses flags meant for the command, so
+  // "npm exec commitlint --edit $1" never passes --edit to commitlint.
+  it('ends npm exec with -- so flags reach the command', () => {
+    expect(pmExec('npm')).toBe('npm exec --');
+  });
+
+  it('uses "<pm> exec" for pnpm and yarn', () => {
     expect(pmExec('pnpm')).toBe('pnpm exec');
     expect(pmExec('yarn')).toBe('yarn exec');
   });

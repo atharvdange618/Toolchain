@@ -301,7 +301,7 @@ src/
   4. Default: npm
 - Framework detection: checks `dependencies` + `devDependencies` for `next` → `express` → `react` → `plain`
 - Monorepo: `workspaces` key in package.json OR `pnpm.workspaces`
-- `pmExec()`: returns `bun run` for bun, `${pm} exec` for others
+- `pmExec()`: returns `bun run` for bun, `npm exec --` for npm (so flags reach the command), `${pm} exec` for others
 
 ### `src/generators/eslint.ts` — ESLint Config Generator
 

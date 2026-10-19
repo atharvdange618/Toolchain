@@ -84,3 +84,12 @@ describe('init with an existing project setup', () => {
     expect(pkg.scripts['typecheck']).toBe('tsc -b --noEmit');
   });
 });
+
+describe('init git hooks and commitlint', () => {
+  it('separates npm exec flags so commitlint receives --edit', async () => {
+    await init({ pm: 'npm', targetDir: dir, yes: true });
+
+    const commitMsg = readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8');
+    expect(commitMsg).toBe('npm exec -- commitlint --edit $1\n');
+  });
+});
