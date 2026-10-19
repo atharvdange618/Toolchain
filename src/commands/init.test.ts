@@ -92,4 +92,14 @@ describe('init git hooks and commitlint', () => {
     const commitMsg = readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8');
     expect(commitMsg).toBe('npm exec -- commitlint --edit $1\n');
   });
+
+  // A CommonJS commitlint.config.js crashes in "type": "module" projects.
+  it('writes an ESM commitlint config that loads in any package type', async () => {
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'commitlint.config.js'))).toBe(false);
+    const config = readFileSync(path.join(dir, 'commitlint.config.mjs'), 'utf8');
+    expect(config).toContain('export default');
+    expect(config).not.toContain('module.exports');
+  });
 });

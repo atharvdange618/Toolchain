@@ -71,8 +71,8 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('.prettierrc');
   writeFile(path.join(targetDir, '.prettierignore'), PRETTIERIGNORE);
   success('.prettierignore');
-  writeFile(path.join(targetDir, 'commitlint.config.js'), COMMITLINT_CONFIG);
-  success('commitlint.config.js');
+  writeFile(path.join(targetDir, 'commitlint.config.mjs'), COMMITLINT_CONFIG);
+  success('commitlint.config.mjs');
 
   step(3, 'Generating ESLint config...');
   for (const name of OTHER_ESLINT_CONFIGS) {

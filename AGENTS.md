@@ -395,7 +395,7 @@ bin/index.js → imports dist/index.js → src/index.ts (Commander CLI)
 | `.editorconfig`          | `static-configs.ts` EDITORCONFIG constant                 |
 | `.prettierrc`            | `static-configs.ts` PRETTIERRC constant                   |
 | `.prettierignore`        | `static-configs.ts` PRETTIERIGNORE constant               |
-| `commitlint.config.js`   | `static-configs.ts` COMMITLINT_CONFIG constant            |
+| `commitlint.config.mjs`  | `static-configs.ts` COMMITLINT_CONFIG constant            |
 | `eslint.config.mjs`      | `generators/eslint.ts` — framework-aware                  |
 | `tsconfig.json`          | `generators/tsconfig.ts` — flat or monorepo               |
 | `.husky/pre-commit`      | `generators/husky.ts`                                     |

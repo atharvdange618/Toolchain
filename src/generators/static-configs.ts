@@ -33,7 +33,7 @@ coverage
 `;
 
 // commitlint expects CommonJS - do not convert to ESM
-export const COMMITLINT_CONFIG = `module.exports = {
+export const COMMITLINT_CONFIG = `export default {
   extends: ['@commitlint/config-conventional'],
 };
 `;

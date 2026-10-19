@@ -92,7 +92,7 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 | --------------------------------- | ------------------------------------------------------------------- |
 | `.editorconfig`                   | Static                                                              |
 | `.prettierrc` / `.prettierignore` | Static                                                              |
-| `commitlint.config.js`            | Static                                                              |
+| `commitlint.config.mjs`           | Static                                                              |
 | `eslint.config.mjs`               | Plain TS / React / Next.js / Express rules, ignores `.expo/`        |
 | `tsconfig.json`                   | Strict config with project references (monorepo)                    |
 | `.husky/pre-commit`               | `lint-staged` + `typecheck`                                         |
@@ -141,7 +141,7 @@ Every generated project gets an interactive commit prompt on top of commitlint's
 pnpm run commit
 ```
 
-This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It reads the same `commitlint.config.js` this tool generates, so the prompt's types and rules always match what the `commit-msg` hook actually enforces - there's no separate config to keep in sync.
+This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It reads the same `commitlint.config.mjs` this tool generates, so the prompt's types and rules always match what the `commit-msg` hook actually enforces - there's no separate config to keep in sync.
 
 ## Detection logic
 
