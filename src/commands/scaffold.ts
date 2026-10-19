@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import prompts from 'prompts';
@@ -153,11 +154,12 @@ export async function scaffold(
     success('package.json');
   }
 
-  // Skip git init for CLI templates (they handle it)
-  if (!result.scaffold) {
-    step(4, 'Initializing git repository...');
+  let stepNumber = result.scaffold ? 2 : 4;
+
+  // create-next-app makes a repo, create-vite doesn't. Husky needs one.
+  if (!existsSync(path.join(targetDir, '.git'))) {
+    step(stepNumber++, 'Initializing git repository...');
     try {
-      const { execSync } = await import('node:child_process');
       execSync('git init', { cwd: targetDir, stdio: 'inherit' });
       success('Git repository initialized');
     } catch {
@@ -165,8 +167,23 @@ export async function scaffold(
     }
   }
 
-  step(result.scaffold ? 2 : 5, 'Setting up toolchain...');
+  step(stepNumber++, 'Setting up toolchain...');
   await init({ pm, targetDir, yes: true });
+
+  // Generated code (ours, create-vite's, create-next-app's) doesn't follow the
+  // rules init just set up, so a new project would fail its own checks.
+  step(stepNumber, 'Fixing lint and formatting generated files...');
+  try {
+    execSync(`${pm} run lint:fix`, { cwd: targetDir, stdio: 'inherit' });
+  } catch {
+    warn(`Some lint errors need a manual fix. Run "${pm} run lint" to see them.`);
+  }
+  try {
+    execSync(`${pm} run format`, { cwd: targetDir, stdio: 'inherit' });
+    success('Generated files formatted');
+  } catch {
+    warn(`Formatting failed. Run "${pm} run format" manually.`);
+  }
 
   const nextCmd = NEXT_COMMAND[template];
   console.log(`\n${'='.repeat(50)}`);
