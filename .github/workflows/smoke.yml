@@ -1,0 +1,25 @@
+name: Smoke
+
+# Scaffolds real projects from the packed CLI. Weekly because versions.ts
+# installs each plugin's latest release, so a new major can break users
+# with no change in this repo.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@22
+          cache: true
+          install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run smoke

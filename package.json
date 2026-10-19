@@ -32,6 +32,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "bash scripts/smoke.sh",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {

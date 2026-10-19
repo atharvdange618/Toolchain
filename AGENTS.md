@@ -380,6 +380,7 @@ pnpm run dev        # Watch mode
 pnpm run lint       # ESLint check
 pnpm run typecheck  # TypeScript type check
 pnpm run format     # Prettier format
+pnpm run smoke      # Scaffold every template from the packed CLI and check it (slow, needs network)
 ```
 
 ## Entry Point
