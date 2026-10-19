@@ -20,8 +20,10 @@ import { error, info, step, success, warn } from '../utils/logger.js';
 // ESLint loads eslint.config.js before eslint.config.mjs, so a leftover .js
 // (create-vite ships one) silently replaces ours. The rest never shadow it
 // but would leave a second config that does nothing. ESLint 9 ignores
-// .eslintrc.* entirely.
+// .eslintrc.* entirely. create-vite 9 ships oxlint instead of ESLint; our
+// lint script replaces its "oxlint" one, leaving .oxlintrc.json unused.
 const OTHER_ESLINT_CONFIGS = [
+  '.oxlintrc.json',
   'eslint.config.js',
   'eslint.config.cjs',
   'eslint.config.ts',

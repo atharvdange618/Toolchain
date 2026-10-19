@@ -155,3 +155,16 @@ describe('init with conflicting commitlint configs', () => {
     expect(existsSync(path.join(dir, 'commitlint.config.mjs'))).toBe(true);
   });
 });
+
+describe('init with a create-vite oxlint setup', () => {
+  // create-vite 9 ships oxlint instead of ESLint. Our lint script replaces
+  // its "oxlint" one, so its config would sit there unused.
+  it('moves .oxlintrc.json aside', async () => {
+    writeFileSync(path.join(dir, '.oxlintrc.json'), '{}\n');
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(false);
+    expect(readFileSync(path.join(dir, '.oxlintrc.json.bak'), 'utf8')).toBe('{}\n');
+  });
+});
