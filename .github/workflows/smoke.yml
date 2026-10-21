@@ -11,6 +11,11 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # Users run more than one pnpm major, and each changes install rules.
+    strategy:
+      fail-fast: false
+      matrix:
+        pnpm: ['11', '12']
     steps:
       - uses: actions/checkout@v7
 
@@ -19,6 +24,11 @@ jobs:
           runtime: node@22
           cache: true
           install: false
+
+      # setup refuses a version that differs from packageManager, so switch
+      # the global pnpm afterwards. Outside the repo, so the pin doesn't apply.
+      - run: pnpm self-update ${{ matrix.pnpm }} && pnpm --version
+        working-directory: ${{ runner.temp }}
 
       - run: pnpm install --frozen-lockfile
 
