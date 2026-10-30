@@ -64,7 +64,7 @@ describe('init with an existing project setup', () => {
     expect(existsSync(path.join(dir, '.eslintrc.json'))).toBe(false);
     expect(readFileSync(path.join(dir, 'eslint.config.js.bak'), 'utf8')).toBe('export default [];\n');
     expect(readFileSync(path.join(dir, '.eslintrc.json.bak'), 'utf8')).toBe('{}\n');
-    expect(existsSync(path.join(dir, 'eslint.config.mjs'))).toBe(true);
+    expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(true);
     expect(stdout).toHaveBeenCalledWith(
       expect.stringContaining('Moved eslint.config.js to eslint.config.js.bak'),
     );
@@ -159,12 +159,12 @@ describe('init with conflicting commitlint configs', () => {
 describe('init with a create-vite oxlint setup', () => {
   // create-vite 9 ships oxlint instead of ESLint. Our lint script replaces
   // its "oxlint" one, so its config would sit there unused.
-  it('moves .oxlintrc.json aside', async () => {
+  it('moves .oxlintrc.json aside and writes ours', async () => {
     writeFileSync(path.join(dir, '.oxlintrc.json'), '{}\n');
 
     await init({ pm: 'pnpm', targetDir: dir, yes: true });
 
-    expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(false);
+    expect(readFileSync(path.join(dir, '.oxlintrc.json'), 'utf8')).toContain('"categories"');
     expect(readFileSync(path.join(dir, '.oxlintrc.json.bak'), 'utf8')).toBe('{}\n');
   });
 });

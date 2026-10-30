@@ -4,8 +4,8 @@ import path from 'node:path';
 import prompts from 'prompts';
 
 import { detect, type PackageManager, pmExec, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
-import { generateEslintConfig } from '../generators/eslint.js';
 import { writeHuskyHooks } from '../generators/husky.js';
+import { generateOxlintConfig } from '../generators/oxlint.js';
 import { updatePackageJson } from '../generators/package-json.js';
 import {
   COMMITLINT_CONFIG,
@@ -93,11 +93,10 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   writeFile(path.join(targetDir, 'commitlint.config.mjs'), COMMITLINT_CONFIG);
   success('commitlint.config.mjs');
 
-  step(3, 'Generating ESLint config...');
-  moveAside(targetDir, OTHER_ESLINT_CONFIGS, 'eslint.config.mjs');
-  const eslintConfig = generateEslintConfig(projectInfo);
-  writeFile(path.join(targetDir, 'eslint.config.mjs'), eslintConfig);
-  success('eslint.config.mjs');
+  step(3, 'Generating oxlint config...');
+  moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
+  writeFile(path.join(targetDir, '.oxlintrc.json'), generateOxlintConfig(projectInfo));
+  success('.oxlintrc.json');
 
   step(4, 'Generating TypeScript config...');
   const tsconfigPath = path.join(targetDir, 'tsconfig.json');
