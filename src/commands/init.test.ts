@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
 vi.mock('../utils/versions.js', () => ({
-  getEslintDeps: vi.fn(() => ({ eslint: '^9.0.0' })),
   getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0' })),
 }));
 

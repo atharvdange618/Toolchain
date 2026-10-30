@@ -10,7 +10,7 @@ import { writeFile } from '../../utils/fs.js';
 vi.mock('../../utils/versions.js', () => ({
   getExpressVersion: vi.fn(() => '^5.0.0'),
   getTurboVersion: vi.fn(() => '^2.0.0'),
-  getTypescriptVersion: vi.fn(() => '~6.0.3'),
+  getTypescriptVersion: vi.fn(() => '^7.0.2'),
   getTypesExpressVersion: vi.fn(() => '^5.0.0'),
   getTypesNodeVersion: vi.fn(() => '^22.0.0'),
 }));

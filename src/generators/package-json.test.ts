@@ -6,18 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectInfo } from '../detectors/project.js';
 
 vi.mock('../utils/versions.js', () => ({
-  getEslintDeps: vi.fn((info: { framework: string; hasReact: boolean }) => {
-    const deps: Record<string, string> = { eslint: '^9.0.0' };
-    if (info.hasReact || info.framework === 'next') {
-      deps['eslint-plugin-react'] = '^7.0.0';
-      deps['eslint-plugin-react-hooks'] = '^5.0.0';
-    }
-    if (info.framework === 'next') {
-      deps['@next/eslint-plugin-next'] = '^15.0.0';
-    }
-    return deps;
-  }),
-  getToolchainDeps: vi.fn(() => ({ prettier: '^3.0.0' })),
+  getToolchainDeps: vi.fn(() => ({ oxlint: '^1.0.0', prettier: '^3.0.0' })),
 }));
 
 vi.mock('../utils/logger.js', () => ({
@@ -66,7 +55,7 @@ describe('updatePackageJson', () => {
       typecheck: 'tsc --noEmit',
     });
     expect(pkg['lint-staged']).toBeDefined();
-    expect(pkg['devDependencies']).toMatchObject({ eslint: '^9.0.0', prettier: '^3.0.0' });
+    expect(pkg['devDependencies']).toMatchObject({ oxlint: '^1.0.0', prettier: '^3.0.0' });
   });
 
   it('uses tsc -b for typecheck when the tsconfig has project references', () => {
@@ -135,46 +124,25 @@ describe('updatePackageJson', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('adds react eslint deps when hasReact is true', () => {
-    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
-
-    updatePackageJson(dir, { ...BASE_INFO, hasReact: true });
-    const pkg = readPkg();
-
-    expect(pkg['devDependencies']).toMatchObject({
-      'eslint-plugin-react': '^7.0.0',
-      'eslint-plugin-react-hooks': '^5.0.0',
-    });
-  });
-
-  it('adds next eslint deps when framework is next', () => {
-    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
-
-    updatePackageJson(dir, { ...BASE_INFO, framework: 'next', hasReact: true });
-    const pkg = readPkg();
-
-    expect(pkg['devDependencies']).toMatchObject({ '@next/eslint-plugin-next': '^15.0.0' });
-  });
-
   it('warns and overwrites when an existing devDependency version differs from the generated one', () => {
     writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ devDependencies: { eslint: '^8.0.0-pinned' }, name: 'my-app' }),
+      JSON.stringify({ devDependencies: { oxlint: '^0.9.0-pinned' }, name: 'my-app' }),
     );
 
     updatePackageJson(dir, BASE_INFO);
     const pkg = readPkg() as { devDependencies: Record<string, string> };
 
-    expect(pkg.devDependencies['eslint']).toBe('^9.0.0');
+    expect(pkg.devDependencies['oxlint']).toBe('^1.0.0');
     expect(pkg.devDependencies['prettier']).toBe('^3.0.0');
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('eslint'));
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('^8.0.0-pinned'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('oxlint'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('^0.9.0-pinned'));
   });
 
   it('does not warn when an existing devDependency version already matches the generated one', () => {
     writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ devDependencies: { eslint: '^9.0.0' }, name: 'my-app' }),
+      JSON.stringify({ devDependencies: { oxlint: '^1.0.0' }, name: 'my-app' }),
     );
 
     updatePackageJson(dir, BASE_INFO);
