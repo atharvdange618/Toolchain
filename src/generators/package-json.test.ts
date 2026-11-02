@@ -51,10 +51,15 @@ describe('updatePackageJson', () => {
 
     expect(pkg['scripts']).toMatchObject({
       commit: 'cz',
-      lint: 'eslint .',
+      lint: 'oxlint .',
+      'lint:fix': 'oxlint . --fix',
+      'lint:strict': 'oxlint . --deny-warnings',
       typecheck: 'tsc --noEmit',
     });
-    expect(pkg['lint-staged']).toBeDefined();
+    expect(pkg['lint-staged']).toEqual({
+      '*.{json,md,css}': ['prettier --write'],
+      '*.{ts,tsx}': ['oxlint --fix', 'prettier --write'],
+    });
     expect(pkg['devDependencies']).toMatchObject({ oxlint: '^1.0.0', prettier: '^3.0.0' });
   });
 
@@ -100,7 +105,7 @@ describe('updatePackageJson', () => {
     const pkg = readPkg() as { scripts: Record<string, string> };
 
     expect(pkg.scripts['start']).toBe('node index.js');
-    expect(pkg.scripts['lint']).toBe('eslint .');
+    expect(pkg.scripts['lint']).toBe('oxlint .');
   });
 
   it('warns and overwrites when a toolchain script name already exists', () => {
@@ -113,7 +118,7 @@ describe('updatePackageJson', () => {
     const pkg = readPkg() as { scripts: Record<string, string> };
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('lint'));
-    expect(pkg.scripts['lint']).toBe('eslint .');
+    expect(pkg.scripts['lint']).toBe('oxlint .');
   });
 
   it('does not warn when there are no script conflicts', () => {

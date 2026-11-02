@@ -52,16 +52,21 @@ describe('init package manager', () => {
 });
 
 describe('init with an existing project setup', () => {
-  it('moves a shadowing eslint.config.js and legacy .eslintrc aside, keeping their contents', async () => {
+  it('moves shadowing eslint.config.js, eslint.config.mjs and legacy .eslintrc aside, keeping their contents', async () => {
     writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    writeFileSync(path.join(dir, 'eslint.config.mjs'), 'export default [];\n');
     writeFileSync(path.join(dir, '.eslintrc.json'), '{}\n');
     const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
 
     await init({ pm: 'pnpm', targetDir: dir, yes: true });
 
     expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(false);
+    expect(existsSync(path.join(dir, 'eslint.config.mjs'))).toBe(false);
     expect(existsSync(path.join(dir, '.eslintrc.json'))).toBe(false);
     expect(readFileSync(path.join(dir, 'eslint.config.js.bak'), 'utf8')).toBe('export default [];\n');
+    expect(readFileSync(path.join(dir, 'eslint.config.mjs.bak'), 'utf8')).toBe(
+      'export default [];\n',
+    );
     expect(readFileSync(path.join(dir, '.eslintrc.json.bak'), 'utf8')).toBe('{}\n');
     expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(true);
     expect(stdout).toHaveBeenCalledWith(
