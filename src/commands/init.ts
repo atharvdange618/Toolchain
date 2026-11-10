@@ -3,10 +3,16 @@ import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import prompts from 'prompts';
 
-import { detect, type PackageManager, pmExec, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
+import {
+  detect,
+  type PackageManager,
+  pmExec,
+  VALID_PACKAGE_MANAGERS,
+  workspacePackageDirs,
+} from '../detectors/project.js';
 import { writeHuskyHooks } from '../generators/husky.js';
 import { generateOxlintConfig } from '../generators/oxlint.js';
-import { updatePackageJson } from '../generators/package-json.js';
+import { ESLINT_DEP, updatePackageJson } from '../generators/package-json.js';
 import {
   COMMITLINT_CONFIG,
   EDITORCONFIG,
@@ -14,7 +20,7 @@ import {
   PRETTIERRC,
 } from '../generators/static-configs.js';
 import { generateTsconfig } from '../generators/tsconfig.js';
-import { writeFile } from '../utils/fs.js';
+import { readJson, writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
 // v2 lints with oxlint, so an ESLint config left in the project does nothing.
@@ -129,6 +135,7 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
     process.exit(1);
   }
   success('package.json updated with scripts, lint-staged, and devDependencies');
+  if (projectInfo.isMonorepo) warnAboutWorkspacePackages(targetDir);
 
   // After package.json, so the hook sees the final scripts.
   step(6, 'Writing Husky hooks...');
@@ -169,5 +176,53 @@ function moveAside(targetDir: string, names: string[], ours: string): void {
     if (!existsSync(file)) continue;
     renameSync(file, `${file}.bak`);
     warn(`Moved ${name} to ${name}.bak so ${ours} takes effect`);
+  }
+}
+
+// init only touches the root, so per-package ESLint setups and TypeScript
+// pins stay. Listing them beats rewriting every package's scripts and deps.
+function warnAboutWorkspacePackages(targetDir: string): void {
+  const eslint: string[] = [];
+  const oldTypescript: string[] = [];
+  for (const rel of workspacePackageDirs(targetDir)) {
+    const pkg = readJson(path.join(targetDir, rel, 'package.json'));
+    const deps = {
+      ...(pkg['dependencies'] as Record<string, string> | undefined),
+      ...(pkg['devDependencies'] as Record<string, string> | undefined),
+    };
+    const lint = (pkg['scripts'] as Record<string, string> | undefined)?.['lint'] ?? '';
+    if (
+      lint.includes('eslint') ||
+      Object.keys(deps).some((name) => ESLINT_DEP.test(name)) ||
+      OTHER_ESLINT_CONFIGS.some(
+        (name) => name !== '.oxlintrc.json' && existsSync(path.join(targetDir, rel, name)),
+      )
+    ) {
+      eslint.push(rel);
+    }
+    const ts = deps['typescript'];
+    const major = Number(/\d+/.exec(ts ?? '')?.[0]);
+    if (!Number.isNaN(major) && major < 7) oldTypescript.push(`${rel} (${ts})`);
+  }
+
+  const turboPath = path.join(targetDir, 'turbo.json');
+  const turboLint =
+    existsSync(turboPath) &&
+    'lint' in ((readJson(turboPath)['tasks'] as Record<string, unknown> | undefined) ?? {});
+
+  if (eslint.length > 0 || turboLint) {
+    warn(
+      `ESLint is still set up in workspace packages, which init leaves alone: ${[
+        ...eslint,
+        ...(turboLint ? ['turbo.json lint task'] : []),
+      ].join(
+        ', ',
+      )}. The root "oxlint ." lints them now, so their eslint configs, ESLint deps and lint scripts can go.`,
+    );
+  }
+  if (oldTypescript.length > 0) {
+    warn(
+      `The root now uses TypeScript 7, but these packages pin their own older typescript: ${oldTypescript.join(', ')}. Their own check scripts keep using it. When you move them to 7, drop baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system" from their tsconfigs.`,
+    );
   }
 }

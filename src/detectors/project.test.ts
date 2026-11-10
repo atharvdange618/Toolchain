@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { detect, pmExec } from './project.js';
+import { detect, pmExec, workspacePackageDirs } from './project.js';
 
 let dir: string;
 
@@ -192,5 +192,33 @@ describe('detect hasRootTsconfig', () => {
     expect(detect(dir).hasRootTsconfig).toBe(false);
     touch('tsconfig.json');
     expect(detect(dir).hasRootTsconfig).toBe(true);
+  });
+});
+
+describe('workspacePackageDirs', () => {
+  function addPackage(rel: string): void {
+    mkdirSync(path.join(dir, rel), { recursive: true });
+    writeFileSync(path.join(dir, rel, 'package.json'), '{}');
+  }
+
+  it('expands npm workspaces, keeping only folders with a package.json', () => {
+    writePackageJson({ workspaces: ['apps/*', 'tools/cli', 'libs/**'] });
+    addPackage('apps/web');
+    addPackage('tools/cli');
+    addPackage('libs/deep/pkg');
+    mkdirSync(path.join(dir, 'apps', 'not-a-package'), { recursive: true });
+
+    expect(workspacePackageDirs(dir)).toEqual(['apps/web', 'tools/cli']);
+  });
+
+  it("reads pnpm-workspace.yaml's packages list and stops at the next key", () => {
+    writePackageJson({});
+    writeFileSync(
+      path.join(dir, 'pnpm-workspace.yaml'),
+      "packages:\r\n  - 'packages/*'\r\n\r\nallowBuilds:\r\n  - esbuild\r\n",
+    );
+    addPackage('packages/ui');
+
+    expect(workspacePackageDirs(dir)).toEqual(['packages/ui']);
   });
 });

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { readJson } from '../utils/fs.js';
@@ -41,6 +41,24 @@ export function pmExec(pm: PackageManager): string {
   if (pm === 'bun') return 'bun run';
   // Without -- npm reads the command's flags as its own (e.g. --edit).
   return pm === 'npm' ? 'npm exec --' : `${pm} exec`;
+}
+
+// Returns the workspace package folders, relative to dir, that hold a
+// package.json.
+// ponytail: handles exact paths and one-level "dir/*" patterns, which is
+// what pnpm, npm and turbo templates use; "**" and "!" patterns are skipped.
+// Use a glob library if a real repo needs them.
+export function workspacePackageDirs(dir: string): string[] {
+  const dirs: string[] = [];
+  for (const pattern of workspacePatterns(dir)) {
+    if (pattern.includes('**') || pattern.startsWith('!')) continue;
+    const clean = pattern.replace(/^\.\//, '').replace(/\/$/, '');
+    const candidates = clean.endsWith('/*')
+      ? listDirs(path.join(dir, clean.slice(0, -2))).map((name) => `${clean.slice(0, -2)}/${name}`)
+      : [clean];
+    dirs.push(...candidates.filter((rel) => existsSync(path.join(dir, rel, 'package.json'))));
+  }
+  return dirs;
 }
 
 // Runs a package that isn't installed yet. npx needs --yes to skip its
@@ -110,4 +128,40 @@ function getAllDeps(pkg: Record<string, unknown>): Record<string, string> {
     ...(pkg['dependencies'] as Record<string, string>),
     ...(pkg['devDependencies'] as Record<string, string>),
   };
+}
+
+function listDirs(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+// ponytail: line-based read of pnpm-workspace.yaml's packages list, so a
+// flow-style list ("packages: [a, b]") is missed. Parse YAML if one shows up.
+function workspacePatterns(dir: string): string[] {
+  const pkg = readJson(path.join(dir, 'package.json'));
+  const workspaces = pkg['workspaces'];
+  if (Array.isArray(workspaces))
+    return workspaces.filter((w): w is string => typeof w === 'string');
+  if (workspaces && typeof workspaces === 'object' && 'packages' in workspaces) {
+    const list = workspaces.packages;
+    if (Array.isArray(list)) return list.filter((w): w is string => typeof w === 'string');
+  }
+  const workspaceFile = path.join(dir, 'pnpm-workspace.yaml');
+  if (!existsSync(workspaceFile)) return [];
+  const lines = readFileSync(workspaceFile, 'utf8').split(/\r?\n/);
+  const start = lines.findIndex((line) => /^packages:\s*$/.test(line));
+  if (start === -1) return [];
+  const patterns: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (!/^\s+-/.test(line)) break;
+    patterns.push(
+      line
+        .replace(/^\s+-\s*/, '')
+        .trim()
+        .replaceAll(/^['"]|['"]$/g, ''),
+    );
+  }
+  return patterns.filter(Boolean);
 }

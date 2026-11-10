@@ -85,7 +85,7 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
 // install time. Covers eslint, @eslint/*, typescript-eslint,
 // @typescript-eslint/*, eslint-{plugin,config,import-resolver}-* and
 // scoped plugins like @next/eslint-plugin-next.
-const ESLINT_DEP =
+export const ESLINT_DEP =
   /^(eslint|typescript-eslint|@(typescript-)?eslint\/.+|eslint-(plugin|config|import-resolver)-.+|@[^/]+\/eslint-(plugin|config)(-.+)?)$/;
 
 function preserveKeyOrder(

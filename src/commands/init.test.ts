@@ -198,6 +198,20 @@ describe('init in a monorepo with no root tsconfig', () => {
     );
     expect(stdout).toHaveBeenCalledWith(expect.stringContaining('No typecheck script'));
   });
+
+  it('lists packages that still use ESLint or pin TypeScript below 7', async () => {
+    writeWorkspace({ typecheck: 'turbo run check' });
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    const output = stdout.mock.calls.map(([chunk]) => String(chunk)).join('');
+    expect(output).toContain(
+      'ESLint is still set up in workspace packages, which init leaves alone: apps/api, turbo.json lint task.',
+    );
+    expect(output).toContain('pin their own older typescript: apps/api (^5.9.2).');
+    expect(output).not.toContain('packages/ui');
+  });
 });
 
 describe('init with a create-vite oxlint setup', () => {
