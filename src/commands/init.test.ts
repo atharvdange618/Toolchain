@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -133,6 +133,70 @@ describe('init with conflicting commitlint configs', () => {
 
     expect(existsSync(path.join(dir, 'commitlint.config.ts'))).toBe(false);
     expect(existsSync(path.join(dir, 'commitlint.config.ts.bak'))).toBe(true);
+  });
+});
+
+describe('init in a monorepo with no root tsconfig', () => {
+  function writeWorkspace(rootScripts: Record<string, string>): void {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ name: 'monorepo', scripts: rootScripts }),
+    );
+    writeFileSync(
+      path.join(dir, 'pnpm-workspace.yaml'),
+      'packages:\n  - "apps/*"\n  - "packages/*"\n',
+    );
+    writeFileSync(path.join(dir, 'turbo.json'), JSON.stringify({ tasks: { build: {}, lint: {} } }));
+    mkdirSync(path.join(dir, 'apps', 'api'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'apps', 'api', 'package.json'),
+      JSON.stringify({
+        devDependencies: { eslint: '^9.0.0', typescript: '^5.9.2' },
+        name: 'api',
+        scripts: { check: 'tsc --noEmit', lint: 'eslint .' },
+      }),
+    );
+    writeFileSync(path.join(dir, 'apps', 'api', 'eslint.config.ts'), 'export default [];\n');
+    mkdirSync(path.join(dir, 'packages', 'ui'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'packages', 'ui', 'package.json'),
+      JSON.stringify({ devDependencies: { typescript: '^7.0.2' }, name: 'ui' }),
+    );
+  }
+
+  function readScripts(): Record<string, string> {
+    return (
+      JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts;
+  }
+
+  // A root config with no include made tsc check every package with the
+  // wrong options: 251 errors on techtalks.
+  it('writes no root tsconfig and keeps the existing typecheck script', async () => {
+    writeWorkspace({ typecheck: 'turbo run check' });
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'tsconfig.json'))).toBe(false);
+    expect(readScripts()['typecheck']).toBe('turbo run check');
+    expect(readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8')).toBe(
+      'pnpm exec lint-staged\npnpm run typecheck\n',
+    );
+  });
+
+  it('warns and leaves typecheck out of the hook when there is no typecheck script', async () => {
+    writeWorkspace({ build: 'turbo run build' });
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readScripts()).not.toHaveProperty('typecheck');
+    expect(readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8')).toBe(
+      'pnpm exec lint-staged\n',
+    );
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining('No typecheck script'));
   });
 });
 

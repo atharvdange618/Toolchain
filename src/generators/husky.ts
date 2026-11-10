@@ -13,10 +13,12 @@ export function writeHuskyHooks(targetDir: string, pm: PackageManager): void {
     | undefined;
   const test = scripts?.['test'];
   const runTests = test !== undefined && !test.includes(NPM_PLACEHOLDER_TEST);
+  // A monorepo with no root tsconfig and no typecheck script of its own gets none.
+  const typecheck = scripts?.['typecheck'] !== undefined;
 
   writeFile(
     path.join(targetDir, '.husky', 'pre-commit'),
-    `${pmExec(pm)} lint-staged\n${pm} run typecheck\n${runTests ? `${pm} run test\n` : ''}`,
+    `${pmExec(pm)} lint-staged\n${typecheck ? `${pm} run typecheck\n` : ''}${runTests ? `${pm} run test\n` : ''}`,
   );
 
   // Quoted so a path with spaces reaches commitlint as one argument.

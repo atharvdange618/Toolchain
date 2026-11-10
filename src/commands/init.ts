@@ -105,21 +105,21 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   success('.oxlintrc.json');
 
   step(4, 'Generating TypeScript config...');
-  const tsconfigPath = path.join(targetDir, 'tsconfig.json');
-  if (existsSync(tsconfigPath)) {
+  if (projectInfo.hasRootTsconfig) {
     info('tsconfig.json already exists, skipping (preserving existing config)');
+  } else if (projectInfo.isMonorepo) {
+    // An empty root config makes tsc check every package with the wrong
+    // options, and init can't tell which packages build with tsc.
+    info('No root tsconfig.json in this monorepo, skipping (each package keeps its own)');
   } else {
-    const tsconfig = generateTsconfig({ isMonorepo: projectInfo.isMonorepo });
-    writeFile(tsconfigPath, tsconfig);
+    writeFile(
+      path.join(targetDir, 'tsconfig.json'),
+      generateTsconfig({ isMonorepo: projectInfo.isMonorepo }),
+    );
     success('tsconfig.json');
   }
 
-  step(5, 'Writing Husky hooks...');
-  writeHuskyHooks(targetDir, pm);
-  success('.husky/pre-commit');
-  success('.husky/commit-msg');
-
-  step(6, 'Updating package.json...');
+  step(5, 'Updating package.json...');
   try {
     updatePackageJson(targetDir, projectInfo);
   } catch (error_) {
@@ -129,6 +129,12 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
     process.exit(1);
   }
   success('package.json updated with scripts, lint-staged, and devDependencies');
+
+  // After package.json, so the hook sees the final scripts.
+  step(6, 'Writing Husky hooks...');
+  writeHuskyHooks(targetDir, pm);
+  success('.husky/pre-commit');
+  success('.husky/commit-msg');
 
   step(7, `Installing dependencies with ${pm}...`);
   try {

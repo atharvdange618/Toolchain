@@ -23,24 +23,28 @@ afterEach(() => {
 
 describe('writeHuskyHooks pre-commit', () => {
   it('runs tests when the target has a test script', () => {
-    expect(preCommitFor({ scripts: { test: 'vitest' } })).toBe(
+    expect(preCommitFor({ scripts: { test: 'vitest', typecheck: 'tsc --noEmit' } })).toBe(
       'pnpm exec lint-staged\npnpm run typecheck\npnpm run test\n',
     );
   });
 
   it('skips tests without a test script', () => {
-    expect(preCommitFor({ scripts: { build: 'tsc' } })).toBe(
-      'pnpm exec lint-staged\npnpm run typecheck\n',
-    );
-    expect(preCommitFor({ name: 'no-scripts' })).toBe(
+    expect(preCommitFor({ scripts: { build: 'tsc', typecheck: 'tsc --noEmit' } })).toBe(
       'pnpm exec lint-staged\npnpm run typecheck\n',
     );
   });
 
   it("skips npm init's placeholder test script, which always fails", () => {
-    expect(preCommitFor({ scripts: { test: 'echo "Error: no test specified" && exit 1' } })).toBe(
-      'pnpm exec lint-staged\npnpm run typecheck\n',
-    );
+    expect(
+      preCommitFor({
+        scripts: { test: 'echo "Error: no test specified" && exit 1', typecheck: 'tsc --noEmit' },
+      }),
+    ).toBe('pnpm exec lint-staged\npnpm run typecheck\n');
+  });
+
+  // A monorepo with no root tsconfig and no typecheck script of its own.
+  it('skips typecheck without a typecheck script', () => {
+    expect(preCommitFor({ name: 'no-scripts' })).toBe('pnpm exec lint-staged\n');
   });
 });
 

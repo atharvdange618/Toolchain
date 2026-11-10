@@ -20,6 +20,7 @@ const BASE_INFO: ProjectInfo = {
   framework: 'plain',
   hasProjectReferences: false,
   hasReact: false,
+  hasRootTsconfig: false,
   isMonorepo: false,
   packageManager: 'pnpm',
 };

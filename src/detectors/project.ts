@@ -12,6 +12,8 @@ export interface ProjectInfo {
   framework: Framework;
   hasProjectReferences: boolean;
   hasReact: boolean;
+  // Read before init writes anything, so it says what the user had.
+  hasRootTsconfig: boolean;
   isMonorepo: boolean;
   packageManager: PackageManager;
 }
@@ -29,6 +31,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
     framework: detectFramework(allDeps),
     hasProjectReferences: detectProjectReferences(dir),
     hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
+    hasRootTsconfig: existsSync(path.join(dir, 'tsconfig.json')),
     isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
   };

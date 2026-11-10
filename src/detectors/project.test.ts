@@ -185,3 +185,12 @@ describe('detect project references', () => {
     expect(detect(dir).hasProjectReferences).toBe(false);
   });
 });
+
+describe('detect hasRootTsconfig', () => {
+  it('reports whether a root tsconfig.json exists before init writes one', () => {
+    writePackageJson({});
+    expect(detect(dir).hasRootTsconfig).toBe(false);
+    touch('tsconfig.json');
+    expect(detect(dir).hasRootTsconfig).toBe(true);
+  });
+});

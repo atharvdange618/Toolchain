@@ -34,9 +34,21 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   // -b follows project references. No --noEmit: a project another one
   // references must emit (TS6310), and solution configs like create-vite's
   // already set noEmit per project.
-  const scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b' } : SCRIPTS;
+  let scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b' } : SCRIPTS;
 
   const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};
+
+  // init writes no root tsconfig for a monorepo without one (each package
+  // has its own), so a root tsc would check every file with the wrong
+  // options. The repo's own typecheck (often turbo run check) stays.
+  if (info.isMonorepo && !info.hasRootTsconfig) {
+    scripts = Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== 'typecheck'));
+    if (!('typecheck' in existingScripts)) {
+      warn(
+        'No typecheck script and no root tsconfig.json, so the pre-commit hook skips typecheck. Add a typecheck script (for example "turbo run check") to turn it on.',
+      );
+    }
+  }
   const conflicts = Object.keys(scripts).filter((key) => key in existingScripts);
   if (conflicts.length > 0) {
     warn(`Overwriting existing scripts: ${conflicts.join(', ')}`);
