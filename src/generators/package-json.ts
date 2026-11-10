@@ -50,7 +50,8 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
 
   const devDeps = getToolchainDeps();
 
-  const existingDeps = (pkg['devDependencies'] as Record<string, string>) ?? {};
+  const existingDeps = removeEslintDeps((pkg['devDependencies'] as Record<string, string>) ?? {});
+  warnOnTypescriptMajorBump(existingDeps['typescript']);
   const depConflicts = Object.keys(devDeps).filter(
     (key) => key in existingDeps && existingDeps[key] !== devDeps[key],
   );
@@ -67,7 +68,18 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
-function preserveKeyOrder(original: Record<string, unknown>, merged: Record<string, unknown>): Record<string, unknown> {
+// v2 lints with oxlint and moves ESLint configs aside, so these packages
+// (v1's own, plus what create-next-app and create-vite add) only cost
+// install time. Covers eslint, @eslint/*, typescript-eslint,
+// @typescript-eslint/*, eslint-{plugin,config,import-resolver}-* and
+// scoped plugins like @next/eslint-plugin-next.
+const ESLINT_DEP =
+  /^(eslint|typescript-eslint|@(typescript-)?eslint\/.+|eslint-(plugin|config|import-resolver)-.+|@[^/]+\/eslint-(plugin|config)(-.+)?)$/;
+
+function preserveKeyOrder(
+  original: Record<string, unknown>,
+  merged: Record<string, unknown>,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(original)) {
     result[key] = key in merged ? merged[key] : original[key];
@@ -76,4 +88,22 @@ function preserveKeyOrder(original: Record<string, unknown>, merged: Record<stri
     if (!(key in result)) result[key] = merged[key];
   }
   return result;
+}
+
+function removeEslintDeps(deps: Record<string, string>): Record<string, string> {
+  const removed = Object.keys(deps).filter((name) => ESLINT_DEP.test(name));
+  if (removed.length === 0) return deps;
+  warn(`Removing ESLint devDependencies (oxlint replaces them): ${removed.join(', ')}`);
+  return Object.fromEntries(Object.entries(deps).filter(([name]) => !ESLINT_DEP.test(name)));
+}
+
+// ponytail: reads the first number in the range, so "~6.0.3" and "^5.8.0"
+// count as below 7 and "latest" or "catalog:" are skipped. Use semver's
+// minVersion if odd ranges ever show up.
+function warnOnTypescriptMajorBump(range: string | undefined): void {
+  const major = Number(/\d+/.exec(range ?? '')?.[0]);
+  if (Number.isNaN(major) || major >= 7) return;
+  warn(
+    `Upgrading typescript from ${range} to 7. TypeScript 7 drops baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system". If typecheck fails, remove those from tsconfig.json.`,
+  );
 }

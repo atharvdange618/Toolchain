@@ -87,7 +87,7 @@ describe('detect', () => {
     expect(detect(dir).isMonorepo).toBe(true);
   });
 
-  // init writes allowBuilds into pnpm-workspace.yaml for single-package pnpm
+  // v1 wrote allowBuilds into pnpm-workspace.yaml for single-package pnpm
   // projects, so the file alone can't mean "monorepo".
   it('is not a monorepo when pnpm-workspace.yaml only holds settings', () => {
     writePackageJson({});

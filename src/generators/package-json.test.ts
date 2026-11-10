@@ -155,3 +155,73 @@ describe('updatePackageJson', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('updatePackageJson ESLint removal', () => {
+  it('removes v1 and create-next-app ESLint devDependencies and lists them', () => {
+    const eslintDeps = {
+      '@eslint/js': '^9.0.0',
+      '@next/eslint-plugin-next': '^16.0.0',
+      '@typescript-eslint/parser': '^8.0.0',
+      eslint: '^9.0.0',
+      'eslint-config-next': '^16.0.0',
+      'eslint-import-resolver-typescript': '^4.0.0',
+      'eslint-plugin-react-hooks': '^7.0.0',
+      'typescript-eslint': '^8.0.0',
+    };
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ devDependencies: { ...eslintDeps, vitest: '^4.0.0' }, name: 'my-app' }),
+    );
+
+    updatePackageJson(dir, BASE_INFO);
+    const pkg = readPkg() as { devDependencies: Record<string, string> };
+
+    expect(Object.keys(pkg.devDependencies).sort()).toEqual(['oxlint', 'prettier', 'vitest']);
+    for (const name of Object.keys(eslintDeps)) {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(name));
+    }
+  });
+
+  it('keeps packages that only mention eslint in passing', () => {
+    const keep = { 'prettier-plugin-tailwindcss': '^0.6.0', 'vite-plugin-eslint-free': '^1.0.0' };
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ devDependencies: keep, name: 'my-app' }),
+    );
+
+    updatePackageJson(dir, BASE_INFO);
+
+    expect(readPkg()['devDependencies']).toMatchObject(keep);
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('Removing ESLint'));
+  });
+});
+
+describe('updatePackageJson TypeScript upgrade', () => {
+  it.each(['~6.0.3', '^5.8.0'])(
+    'warns about TS 7 tsconfig breakage when upgrading from %s',
+    (range) => {
+      writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ devDependencies: { typescript: range }, name: 'my-app' }),
+      );
+
+      updatePackageJson(dir, BASE_INFO);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`Upgrading typescript from ${range} to 7`),
+      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('baseUrl'));
+    },
+  );
+
+  it.each(['^7.0.0', 'latest', 'catalog:'])('does not warn for %s', (range) => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ devDependencies: { typescript: range }, name: 'my-app' }),
+    );
+
+    updatePackageJson(dir, BASE_INFO);
+
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('Upgrading typescript'));
+  });
+});

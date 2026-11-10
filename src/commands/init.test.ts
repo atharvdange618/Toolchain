@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
 vi.mock('../utils/versions.js', () => ({
-  getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0' })),
+  getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0', typescript: '^7.0.2' })),
 }));
 
 const { execSync } = await import('node:child_process');
@@ -108,40 +108,6 @@ describe('init git hooks and commitlint', () => {
   });
 });
 
-describe('init pnpm build approval', () => {
-  const workspaceFile = (): string => path.join(dir, 'pnpm-workspace.yaml');
-
-  it('approves the unrs-resolver build so pnpm 11 install does not fail', async () => {
-    await init({ pm: 'pnpm', targetDir: dir, yes: true });
-
-    expect(readFileSync(workspaceFile(), 'utf8')).toBe('allowBuilds:\n  unrs-resolver: true\n');
-  });
-
-  it('adds to an existing workspace file without touching its other keys', async () => {
-    writeFileSync(workspaceFile(), 'packages:\n  - "apps/*"\nallowBuilds:\n  esbuild: true\n');
-
-    await init({ pm: 'pnpm', targetDir: dir, yes: true });
-
-    expect(readFileSync(workspaceFile(), 'utf8')).toBe(
-      'packages:\n  - "apps/*"\nallowBuilds:\n  unrs-resolver: true\n  esbuild: true\n',
-    );
-  });
-
-  it('leaves an existing unrs-resolver entry alone', async () => {
-    writeFileSync(workspaceFile(), 'allowBuilds:\n  unrs-resolver: false\n');
-
-    await init({ pm: 'pnpm', targetDir: dir, yes: true });
-
-    expect(readFileSync(workspaceFile(), 'utf8')).toBe('allowBuilds:\n  unrs-resolver: false\n');
-  });
-
-  it('writes no workspace file for other package managers', async () => {
-    await init({ pm: 'npm', targetDir: dir, yes: true });
-
-    expect(existsSync(workspaceFile())).toBe(false);
-  });
-});
-
 describe('init with conflicting commitlint configs', () => {
   // commitlint loads .commitlintrc* and commitlint.config.js before our .mjs,
   // so a leftover one (e.g. the CommonJS file older versions wrote) wins.
@@ -173,17 +139,41 @@ describe('init with a create-vite oxlint setup', () => {
   });
 });
 
-describe('init with an inline allowBuilds map', () => {
-  // A line-based edit can't extend `allowBuilds: { ... }` safely; appending
-  // a block would add a second allowBuilds key, which is invalid YAML.
-  it('leaves the file alone and tells the user what to add', async () => {
-    const yaml = 'allowBuilds: { esbuild: true }\n';
-    writeFileSync(path.join(dir, 'pnpm-workspace.yaml'), yaml);
+describe('init upgrading a v1 repo', () => {
+  it('moves the ESLint config aside, drops ESLint deps and upgrades a TS 6 range', async () => {
+    writeFileSync(path.join(dir, 'eslint.config.mjs'), 'export default [];\n');
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({
+        devDependencies: {
+          eslint: '^9.0.0',
+          'eslint-import-resolver-typescript': '^4.0.0',
+          typescript: '~6.0.3',
+          'typescript-eslint': '^8.0.0',
+        },
+        name: 'demo',
+      }),
+    );
     const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
 
     await init({ pm: 'pnpm', targetDir: dir, yes: true });
 
-    expect(readFileSync(path.join(dir, 'pnpm-workspace.yaml'), 'utf8')).toBe(yaml);
-    expect(stdout).toHaveBeenCalledWith(expect.stringContaining('unrs-resolver: true'));
+    const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.devDependencies).toEqual({ husky: '^9.0.0', typescript: '^7.0.2' });
+    expect(existsSync(path.join(dir, 'eslint.config.mjs.bak'))).toBe(true);
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Removing ESLint devDependencies'));
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining('Upgrading typescript from ~6.0.3 to 7'),
+    );
+  });
+
+  // v1 approved unrs-resolver's build for eslint-import-resolver-typescript.
+  // oxlint ships prebuilt binaries, so v2 has nothing to approve.
+  it('writes no pnpm-workspace.yaml for a single-package pnpm project', async () => {
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'pnpm-workspace.yaml'))).toBe(false);
   });
 });

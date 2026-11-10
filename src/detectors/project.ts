@@ -64,7 +64,7 @@ function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {
   // Check for workspaces key in package.json (npm/yarn)
   if ('workspaces' in pkg) return true;
   // Check pnpm-workspace.yaml for a packages list. The file alone isn't
-  // enough: init writes pnpm settings (allowBuilds) into it for any project.
+  // enough: it can hold only settings, like the allowBuilds v1 of this tool wrote.
   const workspaceFile = path.join(dir, 'pnpm-workspace.yaml');
   return existsSync(workspaceFile) && /^packages:/m.test(readFileSync(workspaceFile, 'utf8'));
 }
