@@ -25,15 +25,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc --watch -p tsconfig.build.json",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "bash scripts/smoke.sh",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "commit": "cz",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky"
   },
   "dependencies": {
     "commander": "^13.1.0",
@@ -41,21 +44,21 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
     "@types/node": "^22.15.3",
     "@types/prompts": "^2.4.9",
     "@types/semver": "^7.8.0",
-    "eslint": "^9.39.4",
-    "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-import-x": "^4.17.1",
-    "eslint-plugin-perfectionist": "^5.9.0",
-    "eslint-plugin-unicorn": "^64.0.0",
-    "oxlint": "1.90.0",
-    "prettier": "^3.8.3",
+    "oxlint": "^1.92.0",
+    "prettier": "^3.9.10",
     "semver": "^7.8.5",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.59.3",
-    "vitest": "^4.1.11"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@commitlint/cz-commitlint": "^21.2.4",
+    "commitizen": "^4.3.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "oxlint-tsgolint": "^7.0.2006"
   },
   "engines": {
     "node": ">=18"
@@ -63,5 +66,19 @@
   "packageManager": "pnpm@11.20.0",
   "publishConfig": {
     "access": "public"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
   }
 }

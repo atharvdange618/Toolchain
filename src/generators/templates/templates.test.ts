@@ -21,7 +21,11 @@ const { generatePnpmMonorepo } = await import('./pnpm-monorepo.js');
 const { generateTurbo } = await import('./turbo.js');
 
 const ctx = { packageManager: 'pnpm' as const, projectName: 'demo', targetDir: '', yes: true };
-const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+// TypeScript 7's exports map hides bin/, so resolve the bin from package.json.
+const tsc = path.join(
+  path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')),
+  'bin/tsc',
+);
 
 let dir: string | undefined;
 
