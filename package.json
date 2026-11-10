@@ -1,10 +1,10 @@
 {
   "name": "@atharvdange/toolchain",
   "version": "1.5.0",
-  "description": "Scaffold ESLint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project",
+  "description": "Scaffold oxlint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project",
   "keywords": [
     "toolchain",
-    "eslint",
+    "oxlint",
     "prettier",
     "husky",
     "commitlint",

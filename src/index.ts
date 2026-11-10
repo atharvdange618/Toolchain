@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name('toolchain')
   .description(
-    'Scaffold ESLint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project',
+    'Scaffold oxlint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project',
   )
   .version(pkg.version);
 

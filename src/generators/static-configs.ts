@@ -32,7 +32,6 @@ pnpm-lock.yaml
 coverage
 `;
 
-// commitlint expects CommonJS - do not convert to ESM
 export const COMMITLINT_CONFIG = `export default {
   extends: ['@commitlint/config-conventional'],
 };
