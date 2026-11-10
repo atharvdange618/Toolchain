@@ -43,3 +43,13 @@ describe('writeHuskyHooks pre-commit', () => {
     );
   });
 });
+
+describe('writeHuskyHooks commit-msg', () => {
+  it('quotes the message file path so a path with spaces stays one argument', () => {
+    preCommitFor({ name: 'demo' });
+
+    expect(readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8')).toBe(
+      'pnpm exec commitlint --edit "$1"\n',
+    );
+  });
+});

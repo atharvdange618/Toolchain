@@ -36,7 +36,7 @@ describe('init package manager', () => {
     const preCommit = readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8');
     const commitMsg = readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8');
     expect(preCommit).toBe('pnpm exec lint-staged\npnpm run typecheck\n');
-    expect(commitMsg).toBe('pnpm exec commitlint --edit $1\n');
+    expect(commitMsg).toBe('pnpm exec commitlint --edit "$1"\n');
     expect(execSync).toHaveBeenCalledWith('pnpm install', expect.anything());
   });
 
@@ -94,7 +94,7 @@ describe('init git hooks and commitlint', () => {
     await init({ pm: 'npm', targetDir: dir, yes: true });
 
     const commitMsg = readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8');
-    expect(commitMsg).toBe('npm exec -- commitlint --edit $1\n');
+    expect(commitMsg).toBe('npm exec -- commitlint --edit "$1"\n');
   });
 
   // A CommonJS commitlint.config.js crashes in "type": "module" projects.

@@ -19,5 +19,6 @@ export function writeHuskyHooks(targetDir: string, pm: PackageManager): void {
     `${pmExec(pm)} lint-staged\n${pm} run typecheck\n${runTests ? `${pm} run test\n` : ''}`,
   );
 
-  writeFile(path.join(targetDir, '.husky', 'commit-msg'), `${pmExec(pm)} commitlint --edit $1\n`);
+  // Quoted so a path with spaces reaches commitlint as one argument.
+  writeFile(path.join(targetDir, '.husky', 'commit-msg'), `${pmExec(pm)} commitlint --edit "$1"\n`);
 }
