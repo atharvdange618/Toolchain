@@ -38,8 +38,9 @@ const OTHER_ESLINT_CONFIGS = [
   '.eslintrc.yml',
 ];
 
-// commitlint loads all of these before commitlint.config.mjs, including the
-// CommonJS commitlint.config.js older versions of this tool wrote.
+// commitlint loads the first of these it finds, so any one of them can
+// shadow commitlint.config.mjs or sit next to it as a second config. Covers
+// the CommonJS commitlint.config.js older versions of this tool wrote.
 const OTHER_COMMITLINT_CONFIGS = [
   '.commitlintrc',
   '.commitlintrc.json',
@@ -50,8 +51,12 @@ const OTHER_COMMITLINT_CONFIGS = [
   '.commitlintrc.mjs',
   '.commitlintrc.ts',
   '.commitlintrc.cts',
+  '.commitlintrc.mts',
   'commitlint.config.js',
   'commitlint.config.cjs',
+  'commitlint.config.ts',
+  'commitlint.config.cts',
+  'commitlint.config.mts',
 ];
 
 export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {

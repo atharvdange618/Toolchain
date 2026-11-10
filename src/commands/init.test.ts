@@ -124,6 +124,16 @@ describe('init with conflicting commitlint configs', () => {
     expect(readFileSync(path.join(dir, '.commitlintrc.json.bak'), 'utf8')).toBe('{}\n');
     expect(existsSync(path.join(dir, 'commitlint.config.mjs'))).toBe(true);
   });
+
+  // techtalks ships a commitlint.config.ts, which used to stay as a second config.
+  it('moves a TypeScript commitlint config aside', async () => {
+    writeFileSync(path.join(dir, 'commitlint.config.ts'), 'export default {};\n');
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(existsSync(path.join(dir, 'commitlint.config.ts'))).toBe(false);
+    expect(existsSync(path.join(dir, 'commitlint.config.ts.bak'))).toBe(true);
+  });
 });
 
 describe('init with a create-vite oxlint setup', () => {
