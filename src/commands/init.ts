@@ -93,6 +93,13 @@ export async function init(options: {
   // Before the prompt, so the user isn't asked to proceed and then refused.
   if (projectInfo.unsupported) refuseUnsupported(projectInfo.unsupported);
 
+  // Expo is the one framework whose .js files stay in the lint run.
+  if (!projectInfo.hasTypeScriptFiles && projectInfo.framework !== 'expo') {
+    warn(
+      'No TypeScript files found. The generated .oxlintrc.json ignores .js files and lint-staged only matches .ts/.tsx, so a commit would lint nothing. Rename the sources to .ts, or run "oxlint . --fix" by hand.',
+    );
+  }
+
   if (!options.yes) {
     const response = await prompts({
       initial: true,
@@ -182,6 +189,9 @@ export async function init(options: {
 
   console.log(`\n${'='.repeat(50)}`);
   success('Toolchain is ready!');
+  console.log(
+    '\nSupported: Next.js, Vite + React, Expo, Express, plain TypeScript, and pnpm/Turbo monorepos.',
+  );
   console.log(`\nNext steps:`);
   console.log(`  1. ${pm} run lint:fix`);
   console.log(`  2. ${pm} run typecheck`);

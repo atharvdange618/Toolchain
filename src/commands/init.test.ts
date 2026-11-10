@@ -268,6 +268,61 @@ describe('init with an existing .gitattributes', () => {
   });
 });
 
+describe('init in a JavaScript-only project', () => {
+  it('warns that a commit would lint nothing', async () => {
+    writeFileSync(path.join(dir, 'index.js'), 'module.exports = 1;\n');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'No TypeScript files found. The generated .oxlintrc.json ignores .js',
+      ),
+    );
+    // The configs are still written: the project can grow into TypeScript.
+    expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(true);
+  });
+
+  it('stays quiet once a .ts file exists', async () => {
+    mkdirSync(path.join(dir, 'src'), { recursive: true });
+    writeFileSync(path.join(dir, 'src', 'index.ts'), 'export const a = 1;\n');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining('No TypeScript files found'));
+  });
+
+  // Expo keeps .js in the lint run, so its warning would be wrong.
+  it('stays quiet for an Expo project with no .ts files', async () => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ dependencies: { expo: '^54.0.0', react: '^19.0.0' }, name: 'demo' }),
+    );
+    writeFileSync(path.join(dir, 'App.js'), 'export default function App() { return null; }\n');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining('No TypeScript files found'));
+  });
+
+  it('names the stacks it supports when it finishes', async () => {
+    mkdirSync(path.join(dir, 'src'), { recursive: true });
+    writeFileSync(path.join(dir, 'src', 'index.ts'), 'export const a = 1;\n');
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    const output = [...write.mock.calls, ...log.mock.calls]
+      .map(([chunk]) => String(chunk))
+      .join('');
+    expect(output).toContain('Supported: Next.js, Vite + React, Expo, Express');
+  });
+});
+
 describe('init with a create-vite oxlint setup', () => {
   // create-vite 9 ships oxlint instead of ESLint. Our lint script replaces
   // its "oxlint" one, so its config would sit there unused.

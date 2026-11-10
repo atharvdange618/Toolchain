@@ -21,6 +21,7 @@ const BASE_INFO: ProjectInfo = {
   hasProjectReferences: false,
   hasReact: false,
   hasRootTsconfig: false,
+  hasTypeScriptFiles: true,
   isMonorepo: false,
   packageManager: 'pnpm',
 };

@@ -24,6 +24,8 @@ export interface ProjectInfo {
   hasReact: boolean;
   // Read before init writes anything, so it says what the user had.
   hasRootTsconfig: boolean;
+  // A JS-only project lints nothing once init is done, so init says so.
+  hasTypeScriptFiles: boolean;
   isMonorepo: boolean;
   packageManager: PackageManager;
   unsupported?: UnsupportedStack | undefined;
@@ -43,6 +45,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
     hasProjectReferences: detectProjectReferences(dir),
     hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
     hasRootTsconfig: existsSync(path.join(dir, 'tsconfig.json')),
+    hasTypeScriptFiles: detectTypeScriptFiles(dir),
     isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
     unsupported: detectUnsupported(allDeps),
@@ -115,6 +118,58 @@ const UNSUPPORTED_STACKS: readonly UnsupportedStack[] = [
 
 function detectUnsupported(allDeps: Record<string, string>): UnsupportedStack | undefined {
   return UNSUPPORTED_STACKS.find((stack) => allDeps[stack.package] !== undefined);
+}
+
+const TS_FILE = /\.(?:cts|mts|ts|tsx)$/;
+
+// Directories whose contents never decide how the root should be linted.
+// vendor covers Go and PHP trees that occasionally sit next to a package.json.
+const SKIP_DIRS = new Set([
+  '.expo',
+  '.git',
+  '.next',
+  '.pnpm-store',
+  '.turbo',
+  '.vercel',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+  'out',
+  'vendor',
+]);
+
+// ponytail: bounded depth and entry count instead of a full walk, because this
+// only answers "is there one .ts file". A project that keeps every source
+// deeper than six levels is told it has no TypeScript; none exist yet.
+const MAX_SCAN_DEPTH = 6;
+const MAX_SCAN_ENTRIES = 5000;
+
+function detectTypeScriptFiles(dir: string): boolean {
+  let seen = 0;
+  const walk = (current: string, depth: number): boolean => {
+    if (depth > MAX_SCAN_DEPTH || seen > MAX_SCAN_ENTRIES) return false;
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      // Unreadable directory: treat it as empty rather than failing detect().
+      return false;
+    }
+    for (const entry of entries) {
+      seen++;
+      if (seen > MAX_SCAN_ENTRIES) return false;
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name) && walk(path.join(current, entry.name), depth + 1)) {
+          return true;
+        }
+      } else if (TS_FILE.test(entry.name)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return walk(dir, 0);
 }
 
 function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {

@@ -156,6 +156,46 @@ describe('detect', () => {
   });
 });
 
+describe('detect hasTypeScriptFiles', () => {
+  it('reports a project with a .ts file and one without', () => {
+    writePackageJson({});
+    expect(detect(dir).hasTypeScriptFiles).toBe(false);
+
+    mkdirSync(path.join(dir, 'src'), { recursive: true });
+    writeFileSync(path.join(dir, 'src', 'index.ts'), 'export const a = 1;\n');
+
+    expect(detect(dir).hasTypeScriptFiles).toBe(true);
+  });
+
+  it.each(['.tsx', '.mts', '.cts'])('counts a %s file', (ext) => {
+    writePackageJson({});
+    writeFileSync(path.join(dir, `main${ext}`), '');
+
+    expect(detect(dir).hasTypeScriptFiles).toBe(true);
+  });
+
+  it('ignores TypeScript inside node_modules and build output', () => {
+    writePackageJson({});
+    for (const sub of [
+      ['node_modules', 'dep', 'index.d.ts'],
+      ['dist', 'index.ts'],
+    ] as const) {
+      const target = path.join(dir, ...sub);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, '');
+    }
+
+    expect(detect(dir).hasTypeScriptFiles).toBe(false);
+  });
+
+  it('does not count a lone .js file', () => {
+    writePackageJson({});
+    writeFileSync(path.join(dir, 'index.js'), 'module.exports = 1;\n');
+
+    expect(detect(dir).hasTypeScriptFiles).toBe(false);
+  });
+});
+
 describe('detect unsupported stacks', () => {
   it.each([
     ['@angular/core', 'Angular', 'ngc'],
