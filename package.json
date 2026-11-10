@@ -1,6 +1,6 @@
 {
   "name": "@atharvdange/toolchain",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Scaffold oxlint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project",
   "keywords": [
     "toolchain",
