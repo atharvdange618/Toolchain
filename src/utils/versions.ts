@@ -49,10 +49,53 @@ export function getVersions(packages: string[]): Record<string, string> {
   return result;
 }
 
+// pnpm 11 holds back anything published less than a day ago
+// (minimumReleaseAge defaults to 1440 minutes) and writes an exclude line
+// for it, and for each of oxlint's 19 platform bindings, into the user's
+// pnpm-workspace.yaml. Resolving to a release at least a day old avoids that.
+// ponytail: fixed at one day, so a repo with a longer minimumReleaseAge still
+// gets excludes. Read it from pnpm-workspace.yaml if that comes up.
+const MIN_RELEASE_AGE_MS = 24 * 60 * 60 * 1000;
+
+// The newest stable release published before cutoff, or latest when it is
+// old enough. Falls back to latest when nothing older qualifies.
+export function pickSettledVersion(
+  time: Record<string, string>,
+  latest: string,
+  cutoff: number,
+): string {
+  const isSettled = (version: string): boolean => {
+    const published = time[version];
+    return published !== undefined && Date.parse(published) <= cutoff;
+  };
+  if (isSettled(latest)) return latest;
+  const older = Object.keys(time)
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v) && isSettled(v) && compareVersions(v, latest) < 0)
+    .sort(compareVersions);
+  return older.at(-1) ?? latest;
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 function getLatestVersion(pkg: string): string | undefined {
   if (VERSION_CACHE.has(pkg)) return VERSION_CACHE.get(pkg);
   try {
-    const version = execSync(`npm view ${pkg} version`, { encoding: 'utf8' }).trim();
+    const view = JSON.parse(
+      execSync(`npm view ${pkg} time dist-tags --json`, { encoding: 'utf8' }),
+    ) as { 'dist-tags': { latest: string }; time: Record<string, string> };
+    const version = pickSettledVersion(
+      view.time,
+      view['dist-tags'].latest,
+      Date.now() - MIN_RELEASE_AGE_MS,
+    );
     VERSION_CACHE.set(pkg, version);
     return version;
   } catch {
