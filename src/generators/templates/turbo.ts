@@ -34,7 +34,6 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
       scripts: {
         build: 'pnpm turbo run build',
         dev: 'pnpm turbo run dev',
-        lint: 'pnpm turbo run lint',
         typecheck: 'pnpm turbo run typecheck',
       },
       version: '0.1.0',
@@ -51,7 +50,6 @@ function turboJson(): string {
           build: { dependsOn: ['^build'], outputs: ['dist/**'] },
           clean: { cache: false },
           dev: { cache: false, persistent: true },
-          lint: { dependsOn: ['^build'] },
           typecheck: { dependsOn: ['^build'] },
         },
       },

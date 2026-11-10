@@ -136,7 +136,6 @@ function monorepoPkgJson(name: string, devScript: string, deps?: Record<string, 
         scripts: {
           build: 'tsc',
           dev: devScript,
-          lint: 'tsc --noEmit',
           typecheck: 'tsc --noEmit',
         },
         type: 'module',

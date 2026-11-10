@@ -25,7 +25,6 @@ export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
       scripts: {
         build: 'pnpm -r build',
         dev: 'pnpm -r --parallel dev',
-        lint: 'pnpm -r lint',
         typecheck: 'pnpm -r typecheck',
       },
       version: '0.1.0',

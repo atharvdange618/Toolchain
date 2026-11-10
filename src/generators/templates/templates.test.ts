@@ -81,6 +81,27 @@ describe('monorepo templates', () => {
     expect(parsed.files).toEqual([]);
     expect(parsed.references?.map((ref) => ref.path).sort()).toEqual(packageDirs);
   });
+
+  // init sets the root lint to `oxlint .` with type-aware off for monorepos,
+  // so nothing needs built .d.ts files and no lint has to wait on a build.
+  // A per-package or turbo lint would be a second, slower path.
+  it.each([
+    ['pnpm-monorepo', generatePnpmMonorepo],
+    ['turbo', generateTurbo],
+  ])('%s: leaves lint to the root oxlint script that init writes', (_name, generate) => {
+    const { files, packageJson } = generate(ctx);
+
+    expect(packageJson['scripts']).not.toHaveProperty('lint');
+    for (const file of files.filter((f) => f.path.endsWith('/package.json'))) {
+      const pkg = JSON.parse(file.content) as { scripts: Record<string, string> };
+      expect(pkg.scripts, file.path).not.toHaveProperty('lint');
+    }
+    const turbo = files.find((file) => file.path === 'turbo.json');
+    if (turbo) {
+      const { tasks } = JSON.parse(turbo.content) as { tasks: Record<string, unknown> };
+      expect(tasks).not.toHaveProperty('lint');
+    }
+  });
 });
 
 describe('monorepo gitignore', () => {
