@@ -64,6 +64,20 @@ describe('updatePackageJson', () => {
     expect(pkg['devDependencies']).toMatchObject({ oxlint: '^1.0.0', prettier: '^3.0.0' });
   });
 
+  it('matches plain .js sources for Expo so config plugins get linted', () => {
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
+
+    updatePackageJson(dir, { ...BASE_INFO, framework: 'expo', hasReact: true });
+    const lintStaged = readPkg()['lint-staged'] as Record<string, string[]>;
+
+    expect(Object.keys(lintStaged)).toEqual(['*.{json,md,css}', '*.{js,jsx,cjs,mjs,ts,tsx}']);
+    expect(lintStaged['*.{js,jsx,cjs,mjs,ts,tsx}']).toEqual([
+      'oxlint --fix',
+      'oxlint',
+      'prettier --write',
+    ]);
+  });
+
   it('uses tsc -b for typecheck when the tsconfig has project references', () => {
     writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
 

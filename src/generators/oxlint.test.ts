@@ -31,12 +31,57 @@ const VARIANTS = [
   ['express', { ...BASE_INFO, framework: 'express' }],
   ['react', { ...BASE_INFO, hasReact: true }],
   ['next', { ...BASE_INFO, framework: 'next', hasReact: true }],
+  ['expo', { ...BASE_INFO, framework: 'expo', hasReact: true }],
   ['monorepo', { ...BASE_INFO, isMonorepo: true }],
 ] as const;
 
 function generate(info: ProjectInfo): OxlintConfig {
   return JSON.parse(generateOxlintConfig(info)) as OxlintConfig;
 }
+
+describe('generateOxlintConfig for Expo', () => {
+  const expo = { ...BASE_INFO, framework: 'expo', hasReact: true } as const;
+
+  it('keeps plain .js files in the lint run', () => {
+    const config = generate(expo);
+
+    expect(config.ignorePatterns).not.toContain('**/*.{js,mjs,cjs}');
+    expect(config.ignorePatterns).toContain('**/node_modules/**');
+  });
+
+  it('still ignores .js in every other framework', () => {
+    for (const info of [BASE_INFO, { ...BASE_INFO, framework: 'next' } as const]) {
+      expect(generate(info).ignorePatterns).toContain('**/*.{js,mjs,cjs}');
+    }
+  });
+
+  it('allows require() and turns on the React Compiler rules at warn', () => {
+    const { rules } = generate(expo);
+
+    expect(rules['typescript/no-require-imports']).toBe('off');
+    expect(rules['typescript/no-explicit-any']).toBe('error');
+    expect(rules['react/purity']).toBe('warn');
+    expect(rules['react/immutability']).toBe('warn');
+    expect(rules['react/set-state-in-render']).toBe('warn');
+  });
+
+  it('relaxes rules-of-hooks to warn inside tests only', () => {
+    const config = generateOxlintConfig(expo);
+    const parsed = JSON.parse(config) as {
+      overrides: { files: string[]; rules: Record<string, string> }[];
+      rules: Record<string, string>;
+    };
+
+    expect(parsed.rules['react/rules-of-hooks']).toBe('error');
+    expect(parsed.overrides).toEqual([
+      { files: ['**/*.test.{ts,tsx}'], rules: { 'react/rules-of-hooks': 'warn' } },
+    ]);
+  });
+
+  it('leaves the other frameworks without overrides', () => {
+    expect(JSON.parse(generateOxlintConfig(BASE_INFO))).not.toHaveProperty('overrides');
+  });
+});
 
 describe('generateOxlintConfig', () => {
   it.each(VARIANTS)('matches the snapshot for %s', (_name, info) => {

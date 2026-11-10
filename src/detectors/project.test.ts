@@ -34,6 +34,18 @@ describe('detect', () => {
     expect(() => detect(dir)).toThrow(/No package\.json found/);
   });
 
+  // An Expo app also depends on react and react-dom, so it has to win.
+  it('detects expo as its own framework and still sees react', () => {
+    writePackageJson({
+      dependencies: { expo: '^54.0.0', react: '^19.0.0', 'react-dom': '^19.0.0' },
+    });
+
+    const info = detect(dir);
+
+    expect(info.framework).toBe('expo');
+    expect(info.hasReact).toBe(true);
+  });
+
   it('detects a plain TypeScript project by default', () => {
     writePackageJson({ devDependencies: { typescript: '^5.0.0' } });
 

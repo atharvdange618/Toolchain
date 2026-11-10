@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { readJson } from '../utils/fs.js';
 
-export type Framework = 'express' | 'next' | 'plain' | 'react';
+export type Framework = 'expo' | 'express' | 'next' | 'plain' | 'react';
 export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'yarn';
 
 export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ['bun', 'npm', 'pnpm', 'yarn'];
@@ -87,6 +87,8 @@ export function pmDlx(pm: PackageManager): string {
 }
 
 function detectFramework(allDeps: Record<string, string>): Framework {
+  // An Expo app depends on react and react-dom too, so it goes first.
+  if (allDeps['expo']) return 'expo';
   if (allDeps['next']) return 'next';
   if (allDeps['express']) return 'express';
   if (allDeps['react'] || allDeps['react-dom']) return 'react';
