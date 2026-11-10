@@ -7,6 +7,7 @@ import {
   detect,
   type PackageManager,
   pmExec,
+  type UnsupportedStack,
   VALID_PACKAGE_MANAGERS,
   workspacePackageDirs,
 } from '../detectors/project.js';
@@ -65,9 +66,15 @@ const OTHER_COMMITLINT_CONFIGS = [
   'commitlint.config.mts',
 ];
 
-export async function init(options: { pm?: string; targetDir?: string; yes?: boolean; }): Promise<void> {
+export async function init(options: {
+  pm?: string;
+  targetDir?: string;
+  yes?: boolean;
+}): Promise<void> {
   if (options.pm && !VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
-    error(`Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`);
+    error(
+      `Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`,
+    );
     process.exit(1);
   }
 
@@ -76,10 +83,14 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   step(1, 'Detecting project environment...');
   const projectInfo = detect(targetDir);
   // Resolved once so the hooks and the install can't disagree.
-  const pm: PackageManager = (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
+  const pm: PackageManager =
+    (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
   info(`Framework: ${projectInfo.framework}`);
   info(`Package manager: ${pm}`);
   info(`Monorepo: ${projectInfo.isMonorepo ? 'Yes' : 'No'}`);
+
+  // Before the prompt, so the user isn't asked to proceed and then refused.
+  if (projectInfo.unsupported) refuseUnsupported(projectInfo.unsupported);
 
   if (!options.yes) {
     const response = await prompts({
@@ -167,6 +178,22 @@ export async function init(options: { pm?: string; targetDir?: string; yes?: boo
   console.log(`  1. ${pm} run lint:fix`);
   console.log(`  2. ${pm} run typecheck`);
   console.log(`  3. Make a test commit to verify hooks`);
+}
+
+// Writing our configs into a Vue, Svelte, Astro or Angular project would hand
+// back a typecheck script that skips every component file, which reads as
+// passing. Refusing is the honest answer until those checkers run on TS 7.
+// One error() call so the message stays on stderr, in one piece.
+function refuseUnsupported(stack: UnsupportedStack): never {
+  error(
+    [
+      `Unsupported project: ${stack.name} (found "${stack.package}" in package.json).`,
+      `  ${stack.name} checks its components with ${stack.checker}, which needs TypeScript's compiler API,`,
+      '  and TypeScript 7 no longer ships one, so "tsc --noEmit" would check none of them.',
+      '  Keep this project on TypeScript 6: npm i -D typescript@npm:@typescript/typescript6',
+    ].join('\n'),
+  );
+  return process.exit(1);
 }
 
 // Renames rather than deletes, so the user keeps any custom rules.

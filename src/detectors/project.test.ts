@@ -144,6 +144,43 @@ describe('detect', () => {
   });
 });
 
+describe('detect unsupported stacks', () => {
+  it.each([
+    ['@angular/core', 'Angular', 'ngc'],
+    ['vue', 'Vue', 'vue-tsc'],
+    ['nuxt', 'Nuxt', 'vue-tsc'],
+    ['svelte', 'Svelte', 'svelte-check'],
+    ['@sveltejs/kit', 'SvelteKit', 'svelte-check'],
+    ['astro', 'Astro', 'astro check'],
+  ])('flags %s as %s', (dep, name, checker) => {
+    writePackageJson({ dependencies: { [dep]: '^1.0.0' } });
+
+    expect(detect(dir).unsupported).toEqual({ checker, name, package: dep });
+  });
+
+  it('reads devDependencies too', () => {
+    writePackageJson({ devDependencies: { '@angular/core': '^20.0.0' } });
+
+    expect(detect(dir).unsupported?.name).toBe('Angular');
+  });
+
+  // Angular wins because its template checker is the one that goes furthest
+  // past tsc; a Vue app that also lists Angular by accident is still Angular.
+  it('reports Angular when several unsupported stacks are present', () => {
+    writePackageJson({ dependencies: { '@angular/core': '^20.0.0', vue: '^3.5.0' } });
+
+    expect(detect(dir).unsupported?.name).toBe('Angular');
+  });
+
+  it('flags neither an Expo app nor a Next app', () => {
+    writePackageJson({ dependencies: { expo: '^54.0.0', react: '^19.0.0' } });
+    expect(detect(dir).unsupported).toBeUndefined();
+
+    writePackageJson({ dependencies: { next: '^15.0.0', react: '^19.0.0' } });
+    expect(detect(dir).unsupported).toBeUndefined();
+  });
+});
+
 describe('pmExec', () => {
   it('uses "bun run" for bun', () => {
     expect(pmExec('bun')).toBe('bun run');

@@ -63,7 +63,9 @@ describe('init with an existing project setup', () => {
     expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(false);
     expect(existsSync(path.join(dir, 'eslint.config.mjs'))).toBe(false);
     expect(existsSync(path.join(dir, '.eslintrc.json'))).toBe(false);
-    expect(readFileSync(path.join(dir, 'eslint.config.js.bak'), 'utf8')).toBe('export default [];\n');
+    expect(readFileSync(path.join(dir, 'eslint.config.js.bak'), 'utf8')).toBe(
+      'export default [];\n',
+    );
     expect(readFileSync(path.join(dir, 'eslint.config.mjs.bak'), 'utf8')).toBe(
       'export default [];\n',
     );
@@ -211,6 +213,35 @@ describe('init in a monorepo with no root tsconfig', () => {
     );
     expect(output).toContain('pin their own older typescript: apps/api (^5.9.2).');
     expect(output).not.toContain('packages/ui');
+  });
+});
+
+describe('init in an unsupported project', () => {
+  it('refuses a Vue project before writing anything', async () => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ dependencies: { vue: '^3.5.0' }, name: 'demo' }),
+    );
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    // Mocked exits that return let init carry on, so throw instead and check
+    // the work never started.
+    const exit = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`process.exit(${String(code)})`);
+    });
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    const output = stderr.mock.calls.map(([chunk]) => String(chunk)).join('');
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(output).toContain('Unsupported project: Vue (found "vue" in package.json).');
+    expect(output).toContain('Vue checks its components with vue-tsc');
+    expect(output).toContain('npm i -D typescript@npm:@typescript/typescript6');
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(false);
+    expect(existsSync(path.join(dir, '.husky'))).toBe(false);
+    expect(execSync).not.toHaveBeenCalled();
   });
 });
 

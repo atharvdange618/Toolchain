@@ -8,6 +8,16 @@ export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'yarn';
 
 export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ['bun', 'npm', 'pnpm', 'yarn'];
 
+// A stack whose type checker embeds the TypeScript compiler API. TypeScript 7
+// exports only its version string, so these checkers cannot load it.
+export interface UnsupportedStack {
+  // The checker the project has to run instead of tsc.
+  checker: string;
+  name: string;
+  // The dependency that gives the stack away.
+  package: string;
+}
+
 export interface ProjectInfo {
   framework: Framework;
   hasProjectReferences: boolean;
@@ -16,6 +26,7 @@ export interface ProjectInfo {
   hasRootTsconfig: boolean;
   isMonorepo: boolean;
   packageManager: PackageManager;
+  unsupported?: UnsupportedStack | undefined;
 }
 
 export function detect(dir: string = process.cwd()): ProjectInfo {
@@ -34,6 +45,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
     hasRootTsconfig: existsSync(path.join(dir, 'tsconfig.json')),
     isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
+    unsupported: detectUnsupported(allDeps),
   };
 }
 
@@ -79,6 +91,28 @@ function detectFramework(allDeps: Record<string, string>): Framework {
   if (allDeps['express']) return 'express';
   if (allDeps['react'] || allDeps['react-dom']) return 'react';
   return 'plain';
+}
+
+// TypeScript 7 ships no compiler API: its main export is lib/version.cjs,
+// which holds the version string and nothing else. vue-tsc, svelte-check,
+// astro check and ngc build virtual TypeScript files through that API, so
+// they cannot run on 7, and tsc --noEmit alone checks none of their
+// components. First match wins, so Angular is reported before the Vue and
+// Svelte packages it might drag in.
+// ponytail: a dependency list, not a project structure scan. A monorepo whose
+// packages use Vue but whose root does not is missed; sniff the workspace
+// packages too if that shows up.
+const UNSUPPORTED_STACKS: readonly UnsupportedStack[] = [
+  { checker: 'ngc', name: 'Angular', package: '@angular/core' },
+  { checker: 'vue-tsc', name: 'Vue', package: 'vue' },
+  { checker: 'vue-tsc', name: 'Nuxt', package: 'nuxt' },
+  { checker: 'svelte-check', name: 'Svelte', package: 'svelte' },
+  { checker: 'svelte-check', name: 'SvelteKit', package: '@sveltejs/kit' },
+  { checker: 'astro check', name: 'Astro', package: 'astro' },
+];
+
+function detectUnsupported(allDeps: Record<string, string>): UnsupportedStack | undefined {
+  return UNSUPPORTED_STACKS.find((stack) => allDeps[stack.package] !== undefined);
 }
 
 function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {
