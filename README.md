@@ -1,18 +1,22 @@
 # `@atharvdange/toolchain`
 
-A CLI that sets up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in any JS/TS project with one command.
+A CLI that sets up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in Next.js, React, Expo, Express and plain TS projects with one command.
 
 ```bash
 pnpm dlx @atharvdange/toolchain init
 ```
 
+Release notes live in [CHANGELOG.md](CHANGELOG.md). The v2 rewrite plan and its findings are in [`docs/plans/v2.0.0-oxlint.md`](docs/plans/v2.0.0-oxlint.md).
+
 ## Features
 
 - **Framework-aware** - detects Next.js, Expo, Express, React, or plain TS and picks the oxlint plugins and rules to match
+- **Refuses stacks it cannot check** - Vue, Nuxt, Svelte, SvelteKit, Astro and Angular get a clear refusal instead of a `typecheck` that passes while checking no component files
 - **Monorepo-ready** - detects `workspaces` / `pnpm-workspace.yaml`, sets up the root, and lists workspace packages still on ESLint or TypeScript below 7
 - **Zero-config** - interactive prompts guide you through, or use `--yes` to skip
 - **All in one** - linter, formatter, hooks, commit linting, and type checking
 - **Project scaffolding** - create new projects from scratch with `scaffold` command
+- **Windows-safe** - writes `.gitattributes` so `format:check` passes on a CRLF checkout, and leaves the large-commit chunking to `lint-staged`, which splits the staged files before Windows' 8191-character command line runs out
 - **Opinionated defaults** - strict TypeScript config, type-aware lint rules, proper monorepo structure
 
 ## What it supports
@@ -48,7 +52,12 @@ pnpm dlx @atharvdange/toolchain init
 
 # Non-interactive (defaults)
 pnpm dlx @atharvdange/toolchain init --yes
+
+# Pick the package manager for installs
+pnpm dlx @atharvdange/toolchain init --pm bun
 ```
+
+`init` refuses a project built on Vue, Nuxt, Svelte, SvelteKit, Astro or Angular, and exits 1 without writing anything. It also warns, but still writes the configs, when the project has no TypeScript file yet.
 
 ### `scaffold` - Create a new project
 
@@ -123,6 +132,23 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 | `.husky/commit-msg`               | `commitlint`                                                         |
 | `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies  |
 
+`init` keeps an existing `.gitattributes`, `tsconfig.json` or commitlint config rather than overwrite it, and renames other ESLint, oxlint and commitlint configs to `.bak` so custom rules survive.
+
+## Scripts it adds
+
+| Script         | Command                    | Notes                                                         |
+| -------------- | -------------------------- | ------------------------------------------------------------- |
+| `lint`         | `oxlint .`                 | Type-aware rules come from `.oxlintrc.json`, not the flag     |
+| `lint:fix`     | `oxlint . --fix`           |                                                               |
+| `lint:strict`  | `oxlint . --deny-warnings` | Turns warnings into errors, including the Expo compiler rules |
+| `format`       | `prettier --write .`       |                                                               |
+| `format:check` | `prettier --check .`       |                                                               |
+| `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references        |
+| `commit`       | `cz`                       | Interactive commit prompt                                     |
+| `prepare`      | `husky`                    | Reinstalls the hooks                                          |
+
+`lint-staged` runs `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the commit with the linter's message. Expo projects match `*.{js,jsx,cjs,mjs,ts,tsx}`; every other project matches `*.{ts,tsx}`.
+
 ## TypeScript configuration
 
 The generated `tsconfig.json` includes strict options:
@@ -139,6 +165,8 @@ The generated `tsconfig.json` includes strict options:
 | `noPropertyAccessFromIndexSignature` | Force bracket notation for index signatures       |
 | `verbatimModuleSyntax`               | Enforce `import type` for type-only imports       |
 | `moduleResolution: bundler`          | Modern module resolution for bundlers             |
+
+Node apps (the `plain` and `express` templates) get `NodeNext` resolution and compile `src` to `dist` instead of `bundler`. Monorepo mode adds `composite: true` and an empty `references` list.
 
 ## Lint rules
 
@@ -177,6 +205,16 @@ This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It read
 - **TypeScript files**: scans up to six levels deep for `.ts`, `.tsx`, `.mts` or `.cts`, skipping `node_modules`, build output and `.git`
 - **Monorepo**: checks for `workspaces` in package.json or a `packages:` list in `pnpm-workspace.yaml`
 - **Framework**: checks `dependencies` / `devDependencies` for `expo`, `next`, `express`, then `react`
+
+## Upgrading from 2.0
+
+2.1 only adds config. Re-run `init` in the project:
+
+```bash
+pnpm dlx @atharvdange/toolchain@2 init
+```
+
+It writes `.gitattributes` (unless one exists), adds the second `oxlint` pass to `lint-staged`, and switches an Expo project to the Expo config and glob. Scripts, `tsconfig.json` and dependencies are unchanged. Full notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Upgrading from v1
 
@@ -229,3 +267,16 @@ This reconfigures `core.hooksPath` to point to `.husky`.
 ### npx fails with `EBADDEVENGINES`
 
 `npx @atharvdange/toolchain init` will **not** work when the package's `packageManager` is set to `pnpm` (if you initialized a blank project with `pnpm init`), causing npm to throw an `EBADDEVENGINES` error. Use `pnpm dlx`, `yarn dlx`, or `bunx` instead.
+
+### `format:check` fails on a Windows checkout
+
+With `core.autocrlf=true`, checkout files are CRLF and Prettier expects LF, so it reports files nobody edited. 2.1 writes `.gitattributes` with `* text=auto eol=lf` to prevent it. If the project predates that, add the file and re-check the files out:
+
+```bash
+git rm --cached -r . && git reset --hard
+```
+
+## Author
+
+- X: [@atharvdangedev](https://x.com/atharvdangedev)
+- GitHub: [atharvdange618](https://github.com/atharvdange618)

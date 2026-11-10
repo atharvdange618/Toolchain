@@ -1,14 +1,16 @@
 {
   "name": "@atharvdange/toolchain",
-  "version": "2.0.1",
-  "description": "Scaffold oxlint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project",
+  "version": "2.1.0",
+  "description": "Set up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in Next.js, React, Expo, Express and plain TS projects",
   "keywords": [
     "toolchain",
     "oxlint",
     "prettier",
     "husky",
     "commitlint",
-    "typescript"
+    "typescript",
+    "expo",
+    "react-native"
   ],
   "homepage": "https://github.com/atharvdange618/toolchain",
   "bugs": "https://github.com/atharvdange618/toolchain/issues",

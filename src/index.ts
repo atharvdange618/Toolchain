@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name('toolchain')
   .description(
-    'Scaffold oxlint, Prettier, Husky, commitlint, and strict TypeScript into any JS/TS project',
+    'Set up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in Next.js, React, Expo, Express and plain TS projects',
   )
   .version(pkg.version);
 
