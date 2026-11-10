@@ -59,7 +59,7 @@ describe('updatePackageJson', () => {
     });
     expect(pkg['lint-staged']).toEqual({
       '*.{json,md,css}': ['prettier --write'],
-      '*.{ts,tsx}': ['oxlint --fix', 'prettier --write'],
+      '*.{ts,tsx}': ['oxlint --fix', 'oxlint', 'prettier --write'],
     });
     expect(pkg['devDependencies']).toMatchObject({ oxlint: '^1.0.0', prettier: '^3.0.0' });
   });

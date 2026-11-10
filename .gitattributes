@@ -1,0 +1,4 @@
+# Keep every checkout on LF so Prettier's format:check passes on Windows,
+# where core.autocrlf=true would otherwise hand out CRLF working files.
+* text=auto eol=lf
+*.sh text eol=lf

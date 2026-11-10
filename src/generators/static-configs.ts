@@ -32,6 +32,13 @@ pnpm-lock.yaml
 coverage
 `;
 
+// Without this, a Windows checkout with core.autocrlf=true holds CRLF files
+// that Prettier reports as unformatted, so format:check fails on a tree
+// nobody edited. Prettier compares against LF.
+export const GITATTRIBUTES = `* text=auto eol=lf
+*.sh text eol=lf
+`;
+
 export const COMMITLINT_CONFIG = `export default {
   extends: ['@commitlint/config-conventional'],
 };

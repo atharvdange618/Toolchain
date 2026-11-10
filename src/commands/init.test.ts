@@ -245,6 +245,29 @@ describe('init in an unsupported project', () => {
   });
 });
 
+describe('init with an existing .gitattributes', () => {
+  it('writes one that keeps checkouts on LF', async () => {
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(path.join(dir, '.gitattributes'), 'utf8')).toContain('* text=auto eol=lf');
+  });
+
+  // It may carry LFS filters or per-language rules that init cannot know about.
+  it('leaves an existing file untouched and says so', async () => {
+    writeFileSync(path.join(dir, '.gitattributes'), '*.png filter=lfs diff=lfs merge=lfs -text\n');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readFileSync(path.join(dir, '.gitattributes'), 'utf8')).toBe(
+      '*.png filter=lfs diff=lfs merge=lfs -text\n',
+    );
+    expect(stdout).toHaveBeenCalledWith(
+      expect.stringContaining('.gitattributes already exists, leaving it alone'),
+    );
+  });
+});
+
 describe('init with a create-vite oxlint setup', () => {
   // create-vite 9 ships oxlint instead of ESLint. Our lint script replaces
   // its "oxlint" one, so its config would sit there unused.

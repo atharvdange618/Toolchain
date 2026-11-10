@@ -17,6 +17,7 @@ import { ESLINT_DEP, updatePackageJson } from '../generators/package-json.js';
 import {
   COMMITLINT_CONFIG,
   EDITORCONFIG,
+  GITATTRIBUTES,
   PRETTIERIGNORE,
   PRETTIERRC,
 } from '../generators/static-configs.js';
@@ -112,6 +113,13 @@ export async function init(options: {
   success('.prettierrc');
   writeFile(path.join(targetDir, '.prettierignore'), PRETTIERIGNORE);
   success('.prettierignore');
+  // An existing file may carry LFS filters or per-language rules, so it stays.
+  if (existsSync(path.join(targetDir, '.gitattributes'))) {
+    info('.gitattributes already exists, leaving it alone (add "* text=auto eol=lf" if missing)');
+  } else {
+    writeFile(path.join(targetDir, '.gitattributes'), GITATTRIBUTES);
+    success('.gitattributes');
+  }
   moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
   writeFile(path.join(targetDir, 'commitlint.config.mjs'), COMMITLINT_CONFIG);
   success('commitlint.config.mjs');
