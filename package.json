@@ -73,6 +73,7 @@
     ],
     "*.{ts,tsx}": [
       "oxlint --fix",
+      "oxlint",
       "prettier --write"
     ]
   },
