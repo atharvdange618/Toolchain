@@ -46,6 +46,17 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   // already set noEmit per project.
   let scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b' } : SCRIPTS;
 
+  // Next 15.5+ declares RouteContext, LayoutProps and PageProps in files that
+  // only `next typegen` (or a dev or build run) writes, so tsc alone fails
+  // with TS2304 on a fresh checkout or in CI.
+  const deps = {
+    ...(pkg['devDependencies'] as Record<string, string>),
+    ...(pkg['dependencies'] as Record<string, string>),
+  };
+  if (info.framework === 'next' && hasNextTypegen(deps['next'])) {
+    scripts = { ...scripts, typecheck: `next typegen && ${scripts['typecheck']}` };
+  }
+
   const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};
 
   // init writes no root tsconfig for a monorepo without one (each package
@@ -88,6 +99,16 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   pkg['devDependencies'] = preserveKeyOrder(existingDeps, devDeps);
 
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
+// `next typegen` arrived in Next 15.5. A range's first version decides; a tag
+// like latest or canary has none and means a current Next.
+export function hasNextTypegen(range: string | undefined): boolean {
+  const match = range?.match(/(\d+)(?:\.(\d+))?/);
+  if (!match) return true;
+  const major = Number(match[1]);
+  const minor = Number(match[2] ?? 0);
+  return major > 15 || (major === 15 && minor >= 5);
 }
 
 // v2 lints with oxlint and moves ESLint configs aside, so these packages

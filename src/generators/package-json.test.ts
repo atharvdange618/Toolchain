@@ -87,6 +87,40 @@ describe('updatePackageJson', () => {
     expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc -b' });
   });
 
+  describe('Next.js typecheck', () => {
+    function typecheckFor(next: string): unknown {
+      writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next } }),
+      );
+      updatePackageJson(dir, { ...BASE_INFO, framework: 'next', hasReact: true });
+      return (readPkg()['scripts'] as Record<string, string>)['typecheck'];
+    }
+
+    it('runs next typegen first on Next 15.5 and later, so tsc sees the route types', () => {
+      expect(typecheckFor('16.3.8')).toBe('next typegen && tsc --noEmit');
+      expect(typecheckFor('^15.5.0')).toBe('next typegen && tsc --noEmit');
+    });
+
+    it('assumes a current Next for a tag like latest or canary', () => {
+      expect(typecheckFor('latest')).toBe('next typegen && tsc --noEmit');
+    });
+
+    it('keeps plain tsc before Next 15.5, which has no typegen command', () => {
+      expect(typecheckFor('^15.4.2')).toBe('tsc --noEmit');
+      expect(typecheckFor('14.2.0')).toBe('tsc --noEmit');
+    });
+
+    it('leaves other frameworks alone', () => {
+      writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next: '16.0.0' } }),
+      );
+      updatePackageJson(dir, { ...BASE_INFO, framework: 'react', hasReact: true });
+      expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc --noEmit' });
+    });
+  });
+
   it('wires up commitizen to read prompts from the generated commitlint config', () => {
     writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
 

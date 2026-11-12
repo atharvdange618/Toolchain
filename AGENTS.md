@@ -89,7 +89,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/package-json.ts`
 
-- Scripts: `commit`, `format`, `format:check`, `lint`, `lint:fix`, `lint:strict`, `prepare`, `typecheck` (`tsc -b` when the root tsconfig has project references). A monorepo with no root tsconfig keeps its own `typecheck`.
+- Scripts: `commit`, `format`, `format:check`, `lint`, `lint:fix`, `lint:strict`, `prepare`, `typecheck` (`tsc -b` when the root tsconfig has project references; Next.js 15.5 and later prefix `next typegen &&` so tsc sees the generated route types). A monorepo with no root tsconfig keeps its own `typecheck`.
 - lint-staged: `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the hook. The code glob is `*.{js,jsx,cjs,mjs,ts,tsx}` for Expo and `*.{ts,tsx}` otherwise; `*.{json,md,css}` runs Prettier.
 - Removes ESLint devDependencies (`ESLINT_DEP` regex) and warns when TypeScript moves up to 7.
 

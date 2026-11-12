@@ -136,16 +136,16 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 
 ## Scripts it adds
 
-| Script         | Command                    | Notes                                                         |
-| -------------- | -------------------------- | ------------------------------------------------------------- |
-| `lint`         | `oxlint .`                 | Type-aware rules come from `.oxlintrc.json`, not the flag     |
-| `lint:fix`     | `oxlint . --fix`           |                                                               |
-| `lint:strict`  | `oxlint . --deny-warnings` | Turns warnings into errors, including the Expo compiler rules |
-| `format`       | `prettier --write .`       |                                                               |
-| `format:check` | `prettier --check .`       |                                                               |
-| `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references        |
-| `commit`       | `cz`                       | Interactive commit prompt                                     |
-| `prepare`      | `husky`                    | Reinstalls the hooks                                          |
+| Script         | Command                    | Notes                                                                                              |
+| -------------- | -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `lint`         | `oxlint .`                 | Type-aware rules come from `.oxlintrc.json`, not the flag                                          |
+| `lint:fix`     | `oxlint . --fix`           |                                                                                                    |
+| `lint:strict`  | `oxlint . --deny-warnings` | Turns warnings into errors, including the Expo compiler rules                                      |
+| `format`       | `prettier --write .`       |                                                                                                    |
+| `format:check` | `prettier --check .`       |                                                                                                    |
+| `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references; Next.js 15.5+ runs `next typegen &&` first |
+| `commit`       | `cz`                       | Interactive commit prompt                                                                          |
+| `prepare`      | `husky`                    | Reinstalls the hooks                                                                               |
 
 `lint-staged` runs `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the commit with the linter's message. Expo projects match `*.{js,jsx,cjs,mjs,ts,tsx}`; every other project matches `*.{ts,tsx}`.
 
