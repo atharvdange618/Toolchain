@@ -6,7 +6,7 @@ The global CLAUDE.md covers how to work with Atharv. This file covers the codeba
 
 A CLI that sets up a dev toolchain (oxlint, Prettier, Husky, lint-staged, commitlint, strict TypeScript 7) in a JS/TS project, or scaffolds a new project with it.
 
-- Published as `@atharvdange/toolchain` on npm (v2.1.0)
+- Published as `@atharvdange/toolchain` on npm (v2.1.1)
 - `pnpm dlx @atharvdange/toolchain init` sets up an existing project
 - `pnpm dlx @atharvdange/toolchain scaffold <name> --template <type>` creates a new one
 - Supported stacks: Next.js, Vite + React, Expo / React Native, Express, plain TS, pnpm and Turbo monorepos. Vue, Nuxt, Svelte, SvelteKit, Astro and Angular are refused, because their checkers need the TypeScript compiler API that TS 7 no longer ships.

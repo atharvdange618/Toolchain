@@ -2,6 +2,12 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
+## [2.1.1] - 2026-11-12
+
+### Fixed
+
+- Next.js 15.5 and later get `typecheck: "next typegen && tsc --noEmit"`. Plain `tsc --noEmit` failed with TS2304 on `RouteContext`, `LayoutProps` and `PageProps`, which only `next typegen` or a dev or build run writes. Older Next keeps plain `tsc`, since it has no `typegen` command.
+
 ## [2.1.0] - 2026-11-10
 
 ### Added
