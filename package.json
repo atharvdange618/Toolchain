@@ -14,6 +14,10 @@
   ],
   "homepage": "https://github.com/atharvdange618/toolchain",
   "bugs": "https://github.com/atharvdange618/toolchain/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atharvdange618/Toolchain.git"
+  },
   "license": "MIT",
   "author": "Atharv Dange",
   "type": "module",
