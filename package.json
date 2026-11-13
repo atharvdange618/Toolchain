@@ -1,6 +1,6 @@
 {
   "name": "@atharvdange/toolchain",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Set up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in Next.js, React, Expo, Express and plain TS projects",
   "keywords": [
     "toolchain",

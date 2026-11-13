@@ -2,6 +2,17 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
+## [2.1.2] - 2026-11-13
+
+### Fixed
+
+- Next.js 15.5 and later get `next typegen &&` in front of `lint`, `lint:fix` and `lint:strict`, as `typecheck` already had. Type-aware oxlint reads `RouteContext` from files only `next typegen` writes, so on a fresh checkout or in CI every `context.params` failed as an error-typed value (`no-unsafe-assignment`, `no-unsafe-member-access`).
+- The pre-commit hook runs `next typegen` before `lint-staged` in those projects. `lint-staged` calls oxlint directly, so the typegen in the `lint` script never ran there.
+
+### Notes
+
+- Re-run `init` in a Next.js project set up with 2.1.1 or earlier to pick up the new scripts and hook.
+
 ## [2.1.1] - 2026-11-12
 
 ### Fixed
