@@ -12,6 +12,7 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 ### Notes
 
 - Re-run `init` in a Next.js project set up with 2.1.1 or earlier to pick up the new scripts and hook.
+- 2.1.1 was tagged in git but never reached the registry, so npm goes from 2.1.0 to 2.1.2. Its fix is in this release.
 
 ## [2.1.1] - 2026-11-12
 
