@@ -117,7 +117,39 @@ describe('updatePackageJson', () => {
         JSON.stringify({ name: 'my-app', dependencies: { next: '16.0.0' } }),
       );
       updatePackageJson(dir, { ...BASE_INFO, framework: 'react', hasReact: true });
-      expect(readPkg()['scripts']).toMatchObject({ typecheck: 'tsc --noEmit' });
+      expect(readPkg()['scripts']).toMatchObject({
+        lint: 'oxlint .',
+        typecheck: 'tsc --noEmit',
+      });
+    });
+  });
+
+  // Type-aware oxlint reads RouteContext from the same generated files, so on a
+  // fresh checkout every context.params use fails as an error-typed value.
+  describe('Next.js lint', () => {
+    function scriptsFor(next: string): Record<string, string> {
+      writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ name: 'my-app', dependencies: { next } }),
+      );
+      updatePackageJson(dir, { ...BASE_INFO, framework: 'next', hasReact: true });
+      return readPkg()['scripts'] as Record<string, string>;
+    }
+
+    it('runs next typegen before every oxlint script on Next 15.5 and later', () => {
+      expect(scriptsFor('16.4.6')).toMatchObject({
+        lint: 'next typegen && oxlint .',
+        'lint:fix': 'next typegen && oxlint . --fix',
+        'lint:strict': 'next typegen && oxlint . --deny-warnings',
+      });
+    });
+
+    it('keeps plain oxlint before Next 15.5', () => {
+      expect(scriptsFor('14.2.0')).toMatchObject({
+        lint: 'oxlint .',
+        'lint:fix': 'oxlint . --fix',
+        'lint:strict': 'oxlint . --deny-warnings',
+      });
     });
   });
 

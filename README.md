@@ -120,32 +120,34 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 
 ## What it sets up
 
-| Config                            | Generated variant                                                    |
-| --------------------------------- | -------------------------------------------------------------------- |
-| `.editorconfig`                   | Static                                                               |
-| `.prettierrc` / `.prettierignore` | Static                                                               |
-| `.gitattributes`                  | `* text=auto eol=lf`, so `format:check` passes on a Windows checkout |
-| `commitlint.config.mjs`           | Static                                                               |
-| `.oxlintrc.json`                  | Plain TS / React / Next.js / Expo / Express rules, ignores `.expo/`  |
-| `tsconfig.json`                   | Strict config, only written when the project has none                |
-| `.husky/pre-commit`               | `lint-staged` + `typecheck` + `test` (when a test script exists)     |
-| `.husky/commit-msg`               | `commitlint`                                                         |
-| `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies  |
+| Config                            | Generated variant                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `.editorconfig`                   | Static                                                                                                    |
+| `.prettierrc` / `.prettierignore` | Static                                                                                                    |
+| `.gitattributes`                  | `* text=auto eol=lf`, so `format:check` passes on a Windows checkout                                      |
+| `commitlint.config.mjs`           | Static                                                                                                    |
+| `.oxlintrc.json`                  | Plain TS / React / Next.js / Expo / Express rules, ignores `.expo/`                                       |
+| `tsconfig.json`                   | Strict config, only written when the project has none                                                     |
+| `.husky/pre-commit`               | `lint-staged` + `typecheck` + `test` (when a test script exists); Next.js 15.5+ runs `next typegen` first |
+| `.husky/commit-msg`               | `commitlint`                                                                                              |
+| `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies                                       |
 
 `init` keeps an existing `.gitattributes`, `tsconfig.json` or commitlint config rather than overwrite it, and renames other ESLint, oxlint and commitlint configs to `.bak` so custom rules survive.
 
 ## Scripts it adds
 
-| Script         | Command                    | Notes                                                                                              |
-| -------------- | -------------------------- | -------------------------------------------------------------------------------------------------- |
-| `lint`         | `oxlint .`                 | Type-aware rules come from `.oxlintrc.json`, not the flag                                          |
-| `lint:fix`     | `oxlint . --fix`           |                                                                                                    |
-| `lint:strict`  | `oxlint . --deny-warnings` | Turns warnings into errors, including the Expo compiler rules                                      |
-| `format`       | `prettier --write .`       |                                                                                                    |
-| `format:check` | `prettier --check .`       |                                                                                                    |
-| `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references; Next.js 15.5+ runs `next typegen &&` first |
-| `commit`       | `cz`                       | Interactive commit prompt                                                                          |
-| `prepare`      | `husky`                    | Reinstalls the hooks                                                                               |
+| Script         | Command                    | Notes                                                                                                 |
+| -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `lint`         | `oxlint .`                 | Type-aware rules come from `.oxlintrc.json`, not the flag; Next.js 15.5+ runs `next typegen &&` first |
+| `lint:fix`     | `oxlint . --fix`           |                                                                                                       |
+| `lint:strict`  | `oxlint . --deny-warnings` | Turns warnings into errors, including the Expo compiler rules                                         |
+| `format`       | `prettier --write .`       |                                                                                                       |
+| `format:check` | `prettier --check .`       |                                                                                                       |
+| `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references; Next.js 15.5+ runs `next typegen &&` first    |
+| `commit`       | `cz`                       | Interactive commit prompt                                                                             |
+| `prepare`      | `husky`                    | Reinstalls the hooks                                                                                  |
+
+On Next.js 15.5 and later, `lint`, `lint:fix` and `lint:strict` run `next typegen` first, like `typecheck`. Type-aware oxlint reads `RouteContext` from the files it writes, and on a fresh checkout every `context.params` would otherwise fail as an error-typed value. The pre-commit hook runs `next typegen` before `lint-staged` for the same reason.
 
 `lint-staged` runs `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the commit with the linter's message. Expo projects match `*.{js,jsx,cjs,mjs,ts,tsx}`; every other project matches `*.{ts,tsx}`.
 

@@ -47,14 +47,21 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
   let scripts = info.hasProjectReferences ? { ...SCRIPTS, typecheck: 'tsc -b' } : SCRIPTS;
 
   // Next 15.5+ declares RouteContext, LayoutProps and PageProps in files that
-  // only `next typegen` (or a dev or build run) writes, so tsc alone fails
-  // with TS2304 on a fresh checkout or in CI.
+  // only `next typegen` (or a dev or build run) writes. On a fresh checkout or
+  // in CI, tsc fails with TS2304 and type-aware oxlint reads them as
+  // error-typed values, so every script that runs either gets typegen first.
   const deps = {
     ...(pkg['devDependencies'] as Record<string, string>),
     ...(pkg['dependencies'] as Record<string, string>),
   };
   if (info.framework === 'next' && hasNextTypegen(deps['next'])) {
-    scripts = { ...scripts, typecheck: `next typegen && ${scripts['typecheck']}` };
+    const typed = ['typecheck', 'lint', 'lint:fix', 'lint:strict'];
+    scripts = Object.fromEntries(
+      Object.entries(scripts).map(([key, cmd]) => [
+        key,
+        typed.includes(key) ? `next typegen && ${cmd}` : cmd,
+      ]),
+    );
   }
 
   const existingScripts = (pkg['scripts'] as Record<string, string>) ?? {};

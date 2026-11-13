@@ -46,6 +46,22 @@ describe('writeHuskyHooks pre-commit', () => {
   it('skips typecheck without a typecheck script', () => {
     expect(preCommitFor({ name: 'no-scripts' })).toBe('pnpm exec lint-staged\n');
   });
+
+  // lint-staged calls oxlint directly, so the typegen in the lint script never
+  // runs and type-aware rules see no RouteContext on a fresh clone.
+  it('generates Next route types first when the lint script does', () => {
+    expect(
+      preCommitFor({
+        scripts: { lint: 'next typegen && oxlint .', typecheck: 'next typegen && tsc --noEmit' },
+      }),
+    ).toBe('pnpm exec next typegen\npnpm exec lint-staged\npnpm run typecheck\n');
+  });
+
+  it('skips typegen when the lint script has none', () => {
+    expect(preCommitFor({ scripts: { lint: 'oxlint .', typecheck: 'tsc --noEmit' } })).toBe(
+      'pnpm exec lint-staged\npnpm run typecheck\n',
+    );
+  });
 });
 
 describe('writeHuskyHooks commit-msg', () => {

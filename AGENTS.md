@@ -6,7 +6,7 @@ The global CLAUDE.md covers how to work with Atharv. This file covers the codeba
 
 A CLI that sets up a dev toolchain (oxlint, Prettier, Husky, lint-staged, commitlint, strict TypeScript 7) in a JS/TS project, or scaffolds a new project with it.
 
-- Published as `@atharvdange/toolchain` on npm (v2.1.1)
+- Published as `@atharvdange/toolchain` on npm (v2.1.2)
 - `pnpm dlx @atharvdange/toolchain init` sets up an existing project
 - `pnpm dlx @atharvdange/toolchain scaffold <name> --template <type>` creates a new one
 - Supported stacks: Next.js, Vite + React, Expo / React Native, Express, plain TS, pnpm and Turbo monorepos. Vue, Nuxt, Svelte, SvelteKit, Astro and Angular are refused, because their checkers need the TypeScript compiler API that TS 7 no longer ships.
@@ -84,12 +84,12 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/husky.ts`
 
-- `pre-commit`: `lint-staged`, then `typecheck` if the script exists, then `test` if the script exists and isn't npm's "no test specified" placeholder.
+- `pre-commit`: `next typegen` when the final `lint` script starts with it (Next.js 15.5+, since lint-staged calls oxlint directly), then `lint-staged`, then `typecheck` if the script exists, then `test` if the script exists and isn't npm's "no test specified" placeholder.
 - `commit-msg`: `commitlint --edit "$1"`, quoted so paths with spaces work.
 
 ### `src/generators/package-json.ts`
 
-- Scripts: `commit`, `format`, `format:check`, `lint`, `lint:fix`, `lint:strict`, `prepare`, `typecheck` (`tsc -b` when the root tsconfig has project references; Next.js 15.5 and later prefix `next typegen &&` so tsc sees the generated route types). A monorepo with no root tsconfig keeps its own `typecheck`.
+- Scripts: `commit`, `format`, `format:check`, `lint`, `lint:fix`, `lint:strict`, `prepare`, `typecheck` (`tsc -b` when the root tsconfig has project references; Next.js 15.5 and later prefix `next typegen &&` to `typecheck`, `lint`, `lint:fix` and `lint:strict`, so tsc and type-aware oxlint see the generated route types). A monorepo with no root tsconfig keeps its own `typecheck`.
 - lint-staged: `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the hook. The code glob is `*.{js,jsx,cjs,mjs,ts,tsx}` for Expo and `*.{ts,tsx}` otherwise; `*.{json,md,css}` runs Prettier.
 - Removes ESLint devDependencies (`ESLINT_DEP` regex) and warns when TypeScript moves up to 7.
 
