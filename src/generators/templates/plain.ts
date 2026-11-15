@@ -24,7 +24,7 @@ console.log(greet('World'));
         path: 'src/index.ts',
       },
       { content: GITIGNORE, path: '.gitignore' },
-      { content: generateTsconfig({ isMonorepo: false, nodeApp: true }), path: 'tsconfig.json' },
+      { content: generateTsconfig({ nodeApp: true }), path: 'tsconfig.json' },
     ],
     framework: 'plain',
     hasReact: false,

@@ -1,5 +1,4 @@
 export interface TsconfigOptions {
-  isMonorepo: boolean;
   // A Node app built with tsc and run from dist/, as the plain and express
   // templates are. Bundler resolution would accept extensionless imports
   // that Node then fails to load at runtime.
@@ -40,11 +39,7 @@ const NODE_APP_OPTIONS = {
   rootDir: 'src',
 };
 
-export function generateTsconfig({ isMonorepo, nodeApp = false }: TsconfigOptions): string {
-  if (isMonorepo) {
-    const config = { compilerOptions: { ...COMPILER_OPTIONS, composite: true }, references: [] };
-    return JSON.stringify(config, null, 2) + '\n';
-  }
+export function generateTsconfig({ nodeApp = false }: TsconfigOptions = {}): string {
   const config = nodeApp
     ? { compilerOptions: { ...COMPILER_OPTIONS, ...NODE_APP_OPTIONS }, include: ['src'] }
     : { compilerOptions: COMPILER_OPTIONS };

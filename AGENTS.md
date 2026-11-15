@@ -28,7 +28,7 @@ src/
 │   ├── husky.ts                # .husky/pre-commit and .husky/commit-msg
 │   ├── package-json.ts         # Scripts, lint-staged, devDependencies
 │   ├── static-configs.ts       # .editorconfig, .prettierrc, .prettierignore, commitlint
-│   ├── tsconfig.ts             # Strict tsconfig: flat, Node app or monorepo
+│   ├── tsconfig.ts             # Strict tsconfig: flat or Node app
 │   └── templates/              # One file per scaffold template
 └── utils/
     ├── fs.ts                   # readJson, writeFile (creates parent dirs)
@@ -101,7 +101,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/tsconfig.ts`
 
-Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). The `isMonorepo` branch adds `composite: true` and an empty `references` list, but no caller reaches it: `init` skips the write in a monorepo with no root tsconfig, and the monorepo templates write their own solution-style root config. Only `tsconfig.test.ts` covers it. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
+Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). There is no monorepo variant: `init` writes no root tsconfig in a monorepo that lacks one, and the monorepo templates write their own solution-style root config. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
 
 ### `src/utils/versions.ts`
 

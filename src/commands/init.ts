@@ -153,10 +153,7 @@ export async function init(options: {
     // options, and init can't tell which packages build with tsc.
     info('No root tsconfig.json in this monorepo, skipping (each package keeps its own)');
   } else {
-    writeFile(
-      path.join(targetDir, 'tsconfig.json'),
-      generateTsconfig({ isMonorepo: projectInfo.isMonorepo }),
-    );
+    writeFile(path.join(targetDir, 'tsconfig.json'), generateTsconfig());
     success('tsconfig.json');
   }
 
