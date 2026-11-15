@@ -6,12 +6,12 @@ The global CLAUDE.md covers how to work with Atharv. This file covers the codeba
 
 A CLI that sets up a dev toolchain (oxlint, Prettier, Husky, lint-staged, commitlint, strict TypeScript 7) in a JS/TS project, or scaffolds a new project with it.
 
-- Published as `@atharvdange/toolchain` on npm (v2.1.2)
+- Published as `@atharvdange/toolchain` on npm
 - `pnpm dlx @atharvdange/toolchain init` sets up an existing project
 - `pnpm dlx @atharvdange/toolchain scaffold <name> --template <type>` creates a new one
 - Supported stacks: Next.js, Vite + React, Expo / React Native, Express, plain TS, pnpm and Turbo monorepos. Vue, Nuxt, Svelte, SvelteKit, Astro and Angular are refused, because their checkers need the TypeScript compiler API that TS 7 no longer ships.
 
-v2 replaced ESLint with oxlint, because typescript-eslint pinned TypeScript below 7. The plan and its findings live in `docs/plans/v2.0.0-oxlint.md`; release notes live in `CHANGELOG.md`.
+v2 replaced ESLint with oxlint, because typescript-eslint pinned TypeScript below 7. Release notes live in `CHANGELOG.md`, which is the record of what each version changed and why.
 
 ## Architecture
 
@@ -101,7 +101,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/tsconfig.ts`
 
-Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). Monorepo mode adds `composite: true` and empty `references`. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
+Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). The `isMonorepo` branch adds `composite: true` and an empty `references` list, but no caller reaches it: `init` skips the write in a monorepo with no root tsconfig, and the monorepo templates write their own solution-style root config. Only `tsconfig.test.ts` covers it. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
 
 ### `src/utils/versions.ts`
 
@@ -120,16 +120,21 @@ Asks npm for the newest stable release at least a day old (`pickSettledVersion`)
 ## Build & Development
 
 ```bash
-pnpm run build      # Compile TypeScript to dist/
-pnpm run dev        # Watch mode
-pnpm run lint       # oxlint
-pnpm run typecheck  # tsc --noEmit
-pnpm run format     # Prettier
-pnpm test           # Vitest
-pnpm run smoke      # Scaffold every template from the packed CLI and check it (slow, needs network)
+pnpm run build        # Compile TypeScript to dist/
+pnpm run dev          # Watch mode
+pnpm run lint         # oxlint
+pnpm run lint:fix     # oxlint --fix
+pnpm run lint:strict  # oxlint --deny-warnings
+pnpm run typecheck    # tsc --noEmit
+pnpm run format       # Prettier
+pnpm run format:check # Prettier, check only
+pnpm test             # Vitest
+pnpm run smoke        # Scaffold every template from the packed CLI and check it (slow, needs network)
 ```
 
 This repo uses its own toolchain: the pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
+
+CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
 Entry point: `bin/index.js` imports `dist/index.js`, built from `src/index.ts`.
 

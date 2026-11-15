@@ -6,7 +6,7 @@ A CLI that sets up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 i
 pnpm dlx @atharvdange/toolchain init
 ```
 
-Release notes live in [CHANGELOG.md](CHANGELOG.md). The v2 rewrite plan and its findings are in [`docs/plans/v2.0.0-oxlint.md`](docs/plans/v2.0.0-oxlint.md).
+Release notes live in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
@@ -168,7 +168,7 @@ The generated `tsconfig.json` includes strict options:
 | `verbatimModuleSyntax`               | Enforce `import type` for type-only imports       |
 | `moduleResolution: bundler`          | Modern module resolution for bundlers             |
 
-Node apps (the `plain` and `express` templates) get `NodeNext` resolution and compile `src` to `dist` instead of `bundler`. Monorepo mode adds `composite: true` and an empty `references` list.
+Node apps (the `plain` and `express` templates) get `NodeNext` resolution and compile `src` to `dist` instead of `bundler`. The monorepo templates write a solution-style root `tsconfig.json` (`files: []` plus a `references` entry per package), and each package has its own `composite: true` config. `init` leaves a monorepo's `tsconfig.json` alone when there is one and writes none when there isn't, because an empty root config makes tsc check every package with the wrong options.
 
 ## Lint rules
 
@@ -216,15 +216,19 @@ This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It read
 - **Monorepo**: checks for `workspaces` in package.json or a `packages:` list in `pnpm-workspace.yaml`
 - **Framework**: checks `dependencies` / `devDependencies` for `expo`, `next`, `express`, then `react`
 
-## Upgrading from 2.0
+## Upgrading from 2.1 or 2.0
 
-2.1 only adds config. Re-run `init` in the project:
+Re-run `init` in the project:
 
 ```bash
-pnpm dlx @atharvdange/toolchain@2 init
+pnpm dlx @atharvdange/toolchain@latest init
 ```
 
-It writes `.gitattributes` (unless one exists), adds the second `oxlint` pass to `lint-staged`, and switches an Expo project to the Expo config and glob. Scripts, `tsconfig.json` and dependencies are unchanged. Full notes are in [CHANGELOG.md](CHANGELOG.md).
+From 2.0, it writes `.gitattributes` (unless one exists), adds the second `oxlint` pass to `lint-staged`, and switches an Expo project to the Expo config and glob.
+
+From 2.1, a monorepo picks up type-aware lint, which 2.1 left off. Nothing else changes: scripts, `tsconfig.json` and dependencies stay as they are. If `init` names workspace imports that don't resolve, add the dependency to the importing package's `tsconfig.json` `references`, as described under [Lint rules](#lint-rules).
+
+Full notes for both are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Upgrading from v1
 
