@@ -12,7 +12,7 @@ Release notes live in [CHANGELOG.md](CHANGELOG.md). The v2 rewrite plan and its 
 
 - **Framework-aware** - detects Next.js, Expo, Express, React, or plain TS and picks the oxlint plugins and rules to match
 - **Refuses stacks it cannot check** - Vue, Nuxt, Svelte, SvelteKit, Astro and Angular get a clear refusal instead of a `typecheck` that passes while checking no component files
-- **Monorepo-ready** - detects `workspaces` / `pnpm-workspace.yaml`, sets up the root, and lists workspace packages still on ESLint or TypeScript below 7
+- **Monorepo-ready** - detects `workspaces` / `pnpm-workspace.yaml`, keeps type-aware lint on for workspace imports that resolve through tsconfig `references`, and lists workspace packages still on ESLint or TypeScript below 7
 - **Zero-config** - interactive prompts guide you through, or use `--yes` to skip
 - **All in one** - linter, formatter, hooks, commit linting, and type checking
 - **Project scaffolding** - create new projects from scratch with `scaffold` command
@@ -182,7 +182,15 @@ The generated `.oxlintrc.json` picks its plugins from what's in your `package.js
 | Expo     | Same as React, plus the React Compiler rules |
 | Express  | Same as Plain TS, `no-unsafe-*` set to warn  |
 
-Every config turns on oxlint's `correctness` category plus the typescript-eslint recommended and type-checked rules that oxlint leaves off by default. Type-aware rules run through `oxlint-tsgolint`, which uses TypeScript 7. Monorepos get type-aware rules off, since those rules need every workspace package built first.
+Every config turns on oxlint's `correctness` category plus the typescript-eslint recommended and type-checked rules that oxlint leaves off by default. Type-aware rules run through `oxlint-tsgolint`, which uses TypeScript 7. Monorepos included: `oxlint-tsgolint` follows a tsconfig `references` entry to the other package's source, so nothing has to be built first.
+
+When `init` finds a workspace import that resolves to neither a reference nor a built `.d.ts`, it names the imports and leaves the config alone. Every use of such an import reports under the `no-unsafe-*` rules until it resolves, which is what `typecheck` reports on the same tree. To fix it, add the dependency to the importing package's `tsconfig.json`:
+
+```json
+{ "references": [{ "path": "../../packages/shared" }] }
+```
+
+A reference needs no build at any point. Building the packages works too, but the `.d.ts` has to exist whenever lint runs, so a fresh clone or CI needs that build as well.
 
 From the import plugin, only `no-cycle`, `no-duplicates` and `no-self-import` are on. `tsc` already catches unresolved imports.
 

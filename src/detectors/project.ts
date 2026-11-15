@@ -28,6 +28,9 @@ export interface ProjectInfo {
   hasTypeScriptFiles: boolean;
   isMonorepo: boolean;
   packageManager: PackageManager;
+  // Workspace imports, as "package -> dependency", whose types type-aware
+  // lint cannot resolve. Empty for a single-package project.
+  unresolvedWorkspaceTypes: string[];
   unsupported?: UnsupportedStack | undefined;
 }
 
@@ -48,6 +51,7 @@ export function detect(dir: string = process.cwd()): ProjectInfo {
     hasTypeScriptFiles: detectTypeScriptFiles(dir),
     isMonorepo: detectMonorepo(dir, pkg),
     packageManager: detectPackageManager(dir, pkg),
+    unresolvedWorkspaceTypes: unresolvedWorkspaceTypes(dir),
     unsupported: detectUnsupported(allDeps),
   };
 }
@@ -74,6 +78,46 @@ export function workspacePackageDirs(dir: string): string[] {
     dirs.push(...candidates.filter((rel) => existsSync(path.join(dir, rel, 'package.json'))));
   }
   return dirs;
+}
+
+// Type-aware lint resolves a workspace import one of two ways: a tsconfig
+// reference in the importing package, which tsgolint follows to the other
+// package's source with no build, or the dependency's built .d.ts. With
+// neither, the import is an error type and every no-unsafe-* rule fires on it,
+// so init keeps type-aware linting off for a monorepo in that state.
+// ponytail: package.json fields only. A package that exposes types through an
+// "exports" map alone counts as resolvable; check the map if a real repo shows
+// up with false positives.
+export function unresolvedWorkspaceTypes(dir: string): string[] {
+  const packages = new Map<string, { dir: string; pkg: Record<string, unknown> }>();
+  for (const rel of workspacePackageDirs(dir)) {
+    const pkg = readJson(path.join(dir, rel, 'package.json'));
+    const name = pkg['name'];
+    if (typeof name === 'string' && name !== '') packages.set(name, { dir: rel, pkg });
+  }
+
+  const unresolved: string[] = [];
+  for (const [name, entry] of packages) {
+    const tsconfigPath = path.join(dir, entry.dir, 'tsconfig.json');
+    // No tsconfig of its own means the root config (or none) covers it, so
+    // init can't tell which references apply.
+    if (!existsSync(tsconfigPath)) continue;
+    const referenced = new Set(
+      tsconfigReferences(tsconfigPath).map((rel) => pathKey(path.resolve(dir, entry.dir, rel))),
+    );
+    const deps = {
+      ...(entry.pkg['dependencies'] as Record<string, string> | undefined),
+      ...(entry.pkg['devDependencies'] as Record<string, string> | undefined),
+    };
+    for (const depName of Object.keys(deps)) {
+      const dep = packages.get(depName);
+      if (!dep) continue;
+      if (referenced.has(pathKey(path.join(dir, dep.dir)))) continue;
+      if (hasBuiltTypes(path.join(dir, dep.dir), dep.pkg)) continue;
+      unresolved.push(`${name} -> ${depName}`);
+    }
+  }
+  return unresolved.sort();
 }
 
 // Runs a package that isn't installed yet. npx needs --yes to skip its
@@ -212,6 +256,37 @@ function detectProjectReferences(dir: string): boolean {
   const tsconfigPath = path.join(dir, 'tsconfig.json');
   if (!existsSync(tsconfigPath)) return false;
   return /"references"\s*:\s*\[\s*\{/.test(readFileSync(tsconfigPath, 'utf8'));
+}
+
+// ponytail: regex over the raw text, like detectProjectReferences, because
+// tsconfig is JSONC. A commented-out entry is read as a real one.
+function tsconfigReferences(tsconfigPath: string): string[] {
+  const array = /"references"\s*:\s*\[([\s\S]*?)\]/.exec(readFileSync(tsconfigPath, 'utf8'))?.[1];
+  if (!array) return [];
+  return [...array.matchAll(/"path"\s*:\s*"([^"]+)"/g)].flatMap((match) =>
+    match[1] ? [match[1]] : [],
+  );
+}
+
+// The file TypeScript reads the package's types from. A package with neither
+// field, or with source and no build, resolves without one.
+function hasBuiltTypes(packageDir: string, pkg: Record<string, unknown>): boolean {
+  const types = pkg['types'] ?? pkg['typings'];
+  const main = pkg['main'];
+  const entry =
+    typeof types === 'string'
+      ? types
+      : typeof main === 'string'
+        ? main.replace(/\.js$/, '.d.ts')
+        : undefined;
+  return entry === undefined || existsSync(path.join(packageDir, entry));
+}
+
+// Reference paths and package folders compare as resolved paths, and Windows
+// path comparison is case-insensitive.
+function pathKey(target: string): string {
+  const resolved = path.resolve(target);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function getAllDeps(pkg: Record<string, unknown>): Record<string, string> {

@@ -311,3 +311,82 @@ describe('workspacePackageDirs', () => {
     expect(workspacePackageDirs(dir)).toEqual(['packages/ui']);
   });
 });
+
+describe('unresolvedWorkspaceTypes', () => {
+  function addPackage(rel: string, pkg: Record<string, unknown>, tsconfig?: string): void {
+    mkdirSync(path.join(dir, rel), { recursive: true });
+    writeFileSync(path.join(dir, rel, 'package.json'), JSON.stringify(pkg));
+    if (tsconfig) writeFileSync(path.join(dir, rel, 'tsconfig.json'), tsconfig);
+  }
+
+  function addWebApp(tsconfig: string): void {
+    addPackage(
+      'apps/web',
+      { dependencies: { '@repo/shared': 'workspace:*' }, name: '@repo/web' },
+      tsconfig,
+    );
+  }
+
+  const SHARED = {
+    main: 'dist/index.js',
+    name: '@repo/shared',
+    types: 'dist/index.d.ts',
+  };
+
+  beforeEach(() => {
+    writePackageJson({ workspaces: ['apps/*', 'packages/*'] });
+    addPackage('packages/shared', SHARED);
+  });
+
+  // tsgolint follows a reference to the dependency's source, so a monorepo
+  // that references its packages lints type-aware with nothing built.
+  it('accepts a tsconfig reference to the package', () => {
+    addWebApp('{ "compilerOptions": {}, "references": [{ "path": "../../packages/shared" }] }');
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+
+  it('accepts a built dependency', () => {
+    addWebApp('{ "compilerOptions": {} }');
+    mkdirSync(path.join(dir, 'packages', 'shared', 'dist'), { recursive: true });
+    writeFileSync(path.join(dir, 'packages', 'shared', 'dist', 'index.d.ts'), '');
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+
+  it('lists a workspace import with neither a reference nor built types', () => {
+    addWebApp('{ "compilerOptions": {} }');
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual(['@repo/web -> @repo/shared']);
+  });
+
+  it('ignores dependencies that are not workspace packages', () => {
+    addPackage(
+      'apps/web',
+      { dependencies: { react: '^19.0.0' }, name: '@repo/web' },
+      '{ "compilerOptions": {} }',
+    );
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+
+  it('ignores a package with no tsconfig of its own', () => {
+    addPackage('apps/web', { dependencies: { '@repo/shared': 'workspace:*' }, name: '@repo/web' });
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+
+  it('accepts a package that declares no type entry to resolve', () => {
+    addPackage('packages/shared', { name: '@repo/shared' });
+    addWebApp('{ "compilerOptions": {} }');
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+
+  it('is empty for a single-package project', () => {
+    rmSync(path.join(dir, 'pnpm-workspace.yaml'), { force: true });
+    writePackageJson({ name: 'single' });
+
+    expect(detect(dir).unresolvedWorkspaceTypes).toEqual([]);
+  });
+});

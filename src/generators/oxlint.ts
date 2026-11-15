@@ -101,13 +101,13 @@ export function generateOxlintConfig(info: ProjectInfo): string {
     'unicorn/no-thenable': 'off',
   };
   for (const rule of TS_RECOMMENDED_RULES) rules[`typescript/${rule}`] = 'error';
-  // Monorepo packages must be built before type-aware rules can resolve
-  // their imports, so v1 and v2 both leave them off there.
-  if (!info.isMonorepo) {
-    for (const rule of TS_TYPE_CHECKED_RULES) {
-      rules[`typescript/${rule}`] =
-        info.framework === 'express' && EXPRESS_WARN_RULES.has(rule) ? 'warn' : 'error';
-    }
+  // On for monorepos too. init warns when a workspace import resolves to
+  // neither a tsconfig reference nor a built .d.ts, instead of writing a
+  // weaker config: those imports report under no-unsafe-* until they resolve,
+  // which is the same thing typecheck reports on that tree.
+  for (const rule of TS_TYPE_CHECKED_RULES) {
+    rules[`typescript/${rule}`] =
+      info.framework === 'express' && EXPRESS_WARN_RULES.has(rule) ? 'warn' : 'error';
   }
   if (hasReact) rules['react/rules-of-hooks'] = 'error';
   if (info.framework === 'expo') {
@@ -120,7 +120,7 @@ export function generateOxlintConfig(info: ProjectInfo): string {
     $schema: './node_modules/oxlint/configuration_schema.json',
     categories: { correctness: 'error' },
     ignorePatterns: getIgnores(info),
-    options: { typeAware: !info.isMonorepo },
+    options: { typeAware: true },
     plugins,
     rules,
   };

@@ -2,6 +2,20 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Monorepos get the type-aware rules too. `oxlint-tsgolint` follows a package's tsconfig `references` entry to the other package's source, so nothing has to be built first. Before this, `init` turned type-aware lint off for every monorepo.
+
+### Changed
+
+- `init` names the workspace imports that type-aware lint can't resolve, meaning those with neither a tsconfig `references` entry in the importing package nor a built `.d.ts`. They report under the `no-unsafe-*` rules until fixed, which is also what `typecheck` reports on that tree, so the config no longer changes to avoid them.
+
+### Notes
+
+- Re-run `init` in a monorepo to pick up the new `.oxlintrc.json`. A monorepo whose packages neither reference each other nor get built before lint will report those imports; a `references` entry fixes it with no build step.
+
 ## [2.1.2] - 2026-11-13
 
 ### Fixed

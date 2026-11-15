@@ -50,6 +50,7 @@ Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prom
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.
+- Warns, without weakening the config, when a workspace package imports another whose types resolve neither through a tsconfig `references` entry nor through a built `.d.ts`. Those imports report under `no-unsafe-*` until they resolve, and `typecheck` fails on the same tree, so the warning names them instead of writing rules that check less. `unresolvedWorkspaceTypes` supplies the list.
 - Moves other configs aside (renames to `.bak`) instead of deleting them, so the user keeps custom rules: every ESLint config, an existing `.oxlintrc.json`, and every commitlint config other than `commitlint.config.mjs`.
 - Writes `.gitattributes` only when none exists, since an existing one may carry LFS filters.
 - Keeps an existing `tsconfig.json`. A monorepo with no root tsconfig gets none, because an empty root config makes tsc check every package with the wrong options.
@@ -63,7 +64,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/detectors/project.ts`
 
-- `detect()` returns `ProjectInfo`: `framework`, `hasReact`, `hasProjectReferences`, `hasRootTsconfig`, `hasTypeScriptFiles`, `isMonorepo`, `packageManager`, and `unsupported` when a refused stack is present.
+- `detect()` returns `ProjectInfo`: `framework`, `hasReact`, `hasProjectReferences`, `hasRootTsconfig`, `hasTypeScriptFiles`, `isMonorepo`, `packageManager`, `unresolvedWorkspaceTypes`, and `unsupported` when a refused stack is present.
 - Package manager order: `npm_config_user_agent`, then lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`), then `devEngines.packageManager`, then npm.
 - Framework: `expo`, then `next`, then `express`, then `react`/`react-dom`, else `plain`. Expo wins because an Expo app depends on react too.
 - Unsupported: `@angular/core`, `vue`, `nuxt`, `svelte`, `@sveltejs/kit` and `astro` (first match in that order).
@@ -71,6 +72,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - Monorepo: a `workspaces` key, or a `packages:` list in `pnpm-workspace.yaml`.
 - `pmExec()` gives `bun run`, `npm exec --` (so flags reach the command), or `<pm> exec`. `pmDlx()` gives `bunx`, `npx --yes`, `pnpm dlx` or `yarn dlx`.
 - `workspacePackageDirs()` handles exact paths and one-level `dir/*` patterns only.
+- `unresolvedWorkspaceTypes()` lists `package -> dependency` for every workspace import that resolves to neither a tsconfig `references` entry in the importing package nor the dependency's built `.d.ts`. It reads tsconfig references by regex, compares resolved paths case-insensitively on Windows, and skips a package with no tsconfig of its own, since the root config then decides.
 
 ### `src/generators/oxlint.ts`
 
@@ -78,7 +80,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - `correctness` category on as `error`, plus the typescript-eslint recommended and type-checked rules oxlint doesn't turn on by default, so v2 enforces what v1 did.
 - `import/no-cycle` and `import/no-duplicates` warn, `import/no-self-import` errors.
 - Express relaxes four `no-unsafe-*` rules to `warn`.
-- `options.typeAware` is on, except in monorepos, where type-aware rules would need every package built first. The lint scripts don't pass `--type-aware`, so this setting decides.
+- `options.typeAware` is on for every project, monorepos included: tsgolint follows a tsconfig reference to a workspace package's source with nothing built, and a built `.d.ts` resolves without one. `init` warns, and lists the imports, when neither holds, rather than writing weaker rules. The lint scripts don't pass `--type-aware`, so this setting decides.
 - Expo drops `**/*.{js,mjs,cjs}` from `ignorePatterns` (config plugins and Metro config are `.js`, and so are some sources), turns `typescript/no-require-imports` off, sets the 14 React Compiler rules to `warn`, and adds an `overrides` entry dropping `react/rules-of-hooks` to `warn` in `**/*.test.{ts,tsx}`. Every other framework keeps the `.js` ignore and has no `overrides`.
 - The plugins array and Expo's `files` glob are inlined by string replacement after `JSON.stringify`, because Prettier joins short arrays and a fresh `init` must pass its own `prettier --check`.
 
@@ -113,6 +115,7 @@ Asks npm for the newest stable release at least a day old (`pickSettledVersion`)
 4. Warn about workspace packages instead of rewriting them; `init` only touches the root.
 5. Refuse frameworks whose checker needs the TS compiler API instead of warning, because `tsc --noEmit` exits 0 on them and the user would see a green check that means nothing. A `.js`-only project gets a warning and the configs, since it can grow into TypeScript.
 6. `.js` stays in the lint run only for Expo, where config plugins and Metro config are plain JavaScript.
+7. Type-aware lint is on in monorepos too, since `oxlint-tsgolint` follows tsconfig references to source and needs no build. A workspace import that resolves to neither a reference nor a built `.d.ts` got a config with the rules off at first, and that lost: the check read `dist/` on the machine running `init`, so a dev machine with a recent build wrote the rules on for CI and teammates too. The config is now the same everywhere and `init` names the imports that won't resolve.
 
 ## Build & Development
 

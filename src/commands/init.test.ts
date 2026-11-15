@@ -216,6 +216,59 @@ describe('init in a monorepo with no root tsconfig', () => {
   });
 });
 
+describe('init type-aware lint in a monorepo', () => {
+  function writeWorkspace(webTsconfig: string): void {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ name: 'monorepo', workspaces: ['apps/*', 'packages/*'] }),
+    );
+    mkdirSync(path.join(dir, 'apps', 'web', 'src'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'apps', 'web', 'package.json'),
+      JSON.stringify({ dependencies: { '@repo/shared': 'workspace:*' }, name: '@repo/web' }),
+    );
+    writeFileSync(path.join(dir, 'apps', 'web', 'tsconfig.json'), webTsconfig);
+    writeFileSync(path.join(dir, 'apps', 'web', 'src', 'index.ts'), 'export const web = 1;\n');
+    mkdirSync(path.join(dir, 'packages', 'shared'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'packages', 'shared', 'package.json'),
+      JSON.stringify({ main: 'dist/index.js', name: '@repo/shared', types: 'dist/index.d.ts' }),
+    );
+  }
+
+  function readTypeAware(): boolean {
+    return (
+      JSON.parse(readFileSync(path.join(dir, '.oxlintrc.json'), 'utf8')) as {
+        options: { typeAware: boolean };
+      }
+    ).options.typeAware;
+  }
+
+  it('keeps type-aware lint on when each package references the other', async () => {
+    writeWorkspace(
+      '{ "compilerOptions": {}, "references": [{ "path": "../../packages/shared" }] }',
+    );
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readTypeAware()).toBe(true);
+  });
+
+  // The config stays type-aware either way; init names the imports rather
+  // than writing rules that quietly check less.
+  it('keeps type-aware lint on and names the unresolved imports', async () => {
+    writeWorkspace('{ "compilerOptions": {} }');
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    const output = stdout.mock.calls.map(([chunk]) => String(chunk)).join('');
+    expect(readTypeAware()).toBe(true);
+    expect(output).toContain('Type-aware lint needs each workspace import to resolve');
+    expect(output).toContain('@repo/web -> @repo/shared');
+  });
+});
+
 describe('init in an unsupported project', () => {
   it('refuses a Vue project before writing anything', async () => {
     writeFileSync(

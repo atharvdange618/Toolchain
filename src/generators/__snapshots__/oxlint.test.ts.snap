@@ -160,7 +160,7 @@ exports[`generateOxlintConfig > matches the snapshot for monorepo 1`] = `
     "**/.expo/**"
   ],
   "options": {
-    "typeAware": false
+    "typeAware": true
   },
   "plugins": ["typescript", "unicorn", "import"],
   "rules": {
@@ -182,7 +182,19 @@ exports[`generateOxlintConfig > matches the snapshot for monorepo 1`] = `
     "typescript/no-namespace": "error",
     "typescript/no-require-imports": "error",
     "typescript/no-unnecessary-type-constraint": "error",
-    "typescript/no-unsafe-function-type": "error"
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error"
   }
 }
 "

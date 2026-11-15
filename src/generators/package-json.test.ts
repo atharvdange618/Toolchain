@@ -24,6 +24,7 @@ const BASE_INFO: ProjectInfo = {
   hasTypeScriptFiles: true,
   isMonorepo: false,
   packageManager: 'pnpm',
+  unresolvedWorkspaceTypes: [],
 };
 
 let dir: string;

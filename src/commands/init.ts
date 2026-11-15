@@ -100,6 +100,15 @@ export async function init(options: {
     );
   }
 
+  // The config keeps type-aware rules on either way: writing a weaker config
+  // would hide the problem, and the same imports fail typecheck on that tree.
+  // So init names the imports and the two ways to resolve them.
+  if (projectInfo.unresolvedWorkspaceTypes.length > 0) {
+    warn(
+      `Type-aware lint needs each workspace import to resolve, and these don't: ${projectInfo.unresolvedWorkspaceTypes.join(', ')}. Every use of them reports under the no-unsafe-* rules until they do. Add the dependency to the importing package's tsconfig "references" (needs no build), or build the packages before lint runs (a fresh clone or CI needs that build too).`,
+    );
+  }
+
   if (!options.yes) {
     const response = await prompts({
       initial: true,

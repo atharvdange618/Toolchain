@@ -25,6 +25,7 @@ const BASE_INFO: ProjectInfo = {
   hasTypeScriptFiles: true,
   isMonorepo: false,
   packageManager: 'pnpm',
+  unresolvedWorkspaceTypes: [],
 };
 
 const VARIANTS = [
@@ -135,13 +136,26 @@ describe('generateOxlintConfig', () => {
     expect(config.rules['typescript/no-unsafe-assignment']).toBe('error');
   });
 
-  it('leaves type-aware linting and its rules off for a monorepo', () => {
+  it('turns on type-aware linting for a monorepo whose workspace imports resolve', () => {
     const config = generate({ ...BASE_INFO, isMonorepo: true });
 
-    expect(config.options.typeAware).toBe(false);
-    expect(config.rules['typescript/no-unsafe-assignment']).toBeUndefined();
+    expect(config.options.typeAware).toBe(true);
+    expect(config.rules['typescript/no-unsafe-assignment']).toBe('error');
     expect(config.rules['typescript/no-explicit-any']).toBe('error');
     expect(config.ignorePatterns).toContain('**/packages/*/dist/**');
+  });
+
+  // An unresolved import is an error type, so the no-unsafe-* rules report
+  // every use of it instead of the code around it.
+  it('keeps type-aware lint on when a workspace import cannot resolve', () => {
+    const config = generate({
+      ...BASE_INFO,
+      isMonorepo: true,
+      unresolvedWorkspaceTypes: ['@repo/web -> @repo/shared'],
+    });
+
+    expect(config.options.typeAware).toBe(true);
+    expect(config.rules['typescript/no-unsafe-assignment']).toBe('error');
   });
 
   it('relaxes no-unsafe-* rules to warn for express projects', () => {
