@@ -132,7 +132,7 @@ pnpm test             # Vitest
 pnpm run smoke        # Scaffold every template from the packed CLI and check it (slow, needs network)
 ```
 
-This repo uses its own toolchain: the pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
+This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.husky/commit-msg` are what `generateOxlintConfig` and `writeHuskyHooks` produce for this repo (a plain pnpm project), byte for byte, so they double as a check on the generators. Don't hand-edit them: when you change `oxlint.ts` or `husky.ts`, update these files to the new output in the same commit. The pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
 
 CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
