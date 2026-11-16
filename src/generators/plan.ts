@@ -64,10 +64,7 @@ export function buildPlan(targetDir: string, info: ProjectInfo, pm: PackageManag
   messages.push(...packagePlan.messages);
 
   // From the planned scripts, so the hooks match the package.json they ship with.
-  const hooks = generateHuskyHooks(
-    effectiveScripts(packagePlan.entries, pkg['scripts'] as Record<string, string> | undefined),
-    pm,
-  );
+  const hooks = generateHuskyHooks(effectiveScripts(packagePlan.entries, pkg['scripts']), pm);
   entries.push(
     { path: '.husky/pre-commit', want: hooks.preCommit },
     { path: '.husky/commit-msg', want: hooks.commitMsg },

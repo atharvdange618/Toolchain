@@ -85,7 +85,7 @@ export function generateOxlintConfig(info: ProjectInfo): string {
   return serializeOxlintConfig(buildOxlintConfig(info));
 }
 
-export function buildOxlintConfig(info: ProjectInfo): Record<string, unknown> {
+function buildOxlintConfig(info: ProjectInfo): Record<string, unknown> {
   const hasReact = info.hasReact || info.framework === 'next' || info.framework === 'expo';
   const plugins = ['typescript', 'unicorn', 'import'];
   if (hasReact) plugins.push('react', 'jsx-a11y');

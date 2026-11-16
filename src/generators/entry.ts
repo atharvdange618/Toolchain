@@ -61,11 +61,14 @@ export function applyEntries(targetDir: string, entries: Entry[]): void {
 
 // The scripts package.json will hold once the entries apply, so the hooks can
 // follow the plan instead of the disk.
-export function effectiveScripts(
-  entries: Entry[],
-  onDisk: Record<string, string> | undefined,
-): Record<string, string> {
-  const scripts = { ...onDisk };
+export function effectiveScripts(entries: Entry[], onDisk: unknown): Record<string, string> {
+  // package.json is user data, so keep only string scripts from a plain object.
+  const scripts: Record<string, string> = {};
+  if (typeof onDisk === 'object' && onDisk !== null && !Array.isArray(onDisk)) {
+    for (const [name, cmd] of Object.entries(onDisk)) {
+      if (typeof cmd === 'string') scripts[name] = cmd;
+    }
+  }
   for (const entry of entries) {
     if (!entry.path.startsWith(`${PKG_PREFIX}scripts.`)) continue;
     const [, name] = splitKey(entry.path);

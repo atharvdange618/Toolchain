@@ -85,7 +85,8 @@ function readTree(root: string): Record<string, string> {
     const full = path.join(entry.parentPath, entry.name);
     files[path.relative(root, full).replaceAll('\\', '/')] = readFileSync(full, 'utf8');
   }
-  return Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
+  // The snapshot serializer sorts keys, so read order doesn't matter.
+  return files;
 }
 
 describe('init output', () => {

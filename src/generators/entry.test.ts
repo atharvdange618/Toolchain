@@ -78,6 +78,14 @@ describe('applyEntries', () => {
     expect(readPkgText()).toBe('{"name":"demo"}');
   });
 
+  it('deletes a top-level key and keeps the others in place', () => {
+    writePkg({ name: 'demo', 'lint-staged': { '*.ts': ['eslint'] }, version: '1.0.0' });
+
+    applyEntries(dir, [{ path: 'package.json#lint-staged', want: null }]);
+
+    expect(Object.keys(JSON.parse(readPkgText()) as object)).toEqual(['name', 'version']);
+  });
+
   it('refuses a file deletion, which this step never plans', () => {
     expect(() => applyEntries(dir, [{ path: '.prettierrc', want: null }])).toThrow('.prettierrc');
     expect(existsSync(path.join(dir, '.prettierrc'))).toBe(false);
@@ -102,5 +110,16 @@ describe('effectiveScripts', () => {
 
   it('returns an empty object with no scripts and no entries', () => {
     expect(effectiveScripts([], undefined)).toEqual({});
+  });
+
+  it.each([
+    ['a string', 'oxlint .'],
+    ['an array', ['oxlint .']],
+  ])('ignores scripts on disk when they are %s', (_name, onDisk) => {
+    expect(effectiveScripts([], onDisk)).toEqual({});
+  });
+
+  it('drops non-string script values on disk', () => {
+    expect(effectiveScripts([], { lint: 'oxlint .', odd: 42 })).toEqual({ lint: 'oxlint .' });
   });
 });
