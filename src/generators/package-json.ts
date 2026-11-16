@@ -1,10 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-
 import type { ProjectInfo } from '../detectors/project.js';
-
-import { warn } from '../utils/logger.js';
-import { getToolchainDeps } from '../utils/versions.js';
+import type { Entry, PlanMessage } from './entry.js';
 
 const SCRIPTS: Record<string, string> = {
   commit: 'cz',
@@ -37,9 +32,18 @@ function lintStaged(info: ProjectInfo): Record<string, string[]> {
 // truth to keep in sync.
 const COMMITIZEN_CONFIG = { path: '@commitlint/cz-commitlint' };
 
-export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
-  const pkgPath = path.join(targetDir, 'package.json');
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
+// Reads the parsed package.json and writes nothing: the entries say what each
+// key should become, and applyEntries keeps existing keys where they are.
+export function planPackageJson(
+  pkg: Record<string, unknown>,
+  info: ProjectInfo,
+  toolchainDeps: Record<string, string>,
+): { entries: Entry[]; messages: PlanMessage[] } {
+  const entries: Entry[] = [];
+  const messages: PlanMessage[] = [];
+  const warn = (text: string): void => {
+    messages.push({ level: 'warn', text });
+  };
 
   // -b follows project references. No --noEmit: a project another one
   // references must emit (TS6310), and solution configs like create-vite's
@@ -82,30 +86,42 @@ export function updatePackageJson(targetDir: string, info: ProjectInfo): void {
     warn(`Overwriting existing scripts: ${conflicts.join(', ')}`);
   }
 
-  pkg['scripts'] = preserveKeyOrder(existingScripts, scripts);
-  pkg['lint-staged'] = lintStaged(info);
+  for (const [name, cmd] of Object.entries(scripts)) {
+    entries.push({ path: `package.json#scripts.${name}`, want: JSON.stringify(cmd) });
+  }
+  entries.push(
+    { path: 'package.json#lint-staged', want: JSON.stringify(lintStaged(info)) },
+    { path: 'package.json#config.commitizen', want: JSON.stringify(COMMITIZEN_CONFIG) },
+  );
 
-  const existingConfig = (pkg['config'] as Record<string, unknown>) ?? {};
-  pkg['config'] = { ...existingConfig, commitizen: COMMITIZEN_CONFIG };
+  const allDeps = (pkg['devDependencies'] as Record<string, string>) ?? {};
+  const removed = Object.keys(allDeps).filter((name) => ESLINT_DEP.test(name));
+  if (removed.length > 0) {
+    warn(`Removing ESLint devDependencies (oxlint replaces them): ${removed.join(', ')}`);
+  }
+  for (const name of removed)
+    entries.push({ path: `package.json#devDependencies.${name}`, want: null });
+  const existingDeps = Object.fromEntries(
+    Object.entries(allDeps).filter(([name]) => !removed.includes(name)),
+  );
 
-  const devDeps = getToolchainDeps();
-
-  const existingDeps = removeEslintDeps((pkg['devDependencies'] as Record<string, string>) ?? {});
-  warnOnTypescriptMajorBump(existingDeps['typescript']);
-  const depConflicts = Object.keys(devDeps).filter(
-    (key) => key in existingDeps && existingDeps[key] !== devDeps[key],
+  const typescriptWarning = typescriptMajorBumpWarning(existingDeps['typescript']);
+  if (typescriptWarning) warn(typescriptWarning);
+  const depConflicts = Object.keys(toolchainDeps).filter(
+    (key) => key in existingDeps && existingDeps[key] !== toolchainDeps[key],
   );
   if (depConflicts.length > 0) {
     warn(
       `Overwriting existing devDependency versions: ${depConflicts
-        .map((key) => `${key} (${existingDeps[key]} -> ${devDeps[key]})`)
+        .map((key) => `${key} (${existingDeps[key]} -> ${toolchainDeps[key]})`)
         .join(', ')}`,
     );
   }
+  for (const [name, version] of Object.entries(toolchainDeps)) {
+    entries.push({ path: `package.json#devDependencies.${name}`, want: JSON.stringify(version) });
+  }
 
-  pkg['devDependencies'] = preserveKeyOrder(existingDeps, devDeps);
-
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  return { entries, messages };
 }
 
 // `next typegen` arrived in Next 15.5. A range's first version decides; a tag
@@ -126,34 +142,11 @@ export function hasNextTypegen(range: string | undefined): boolean {
 export const ESLINT_DEP =
   /^(eslint|typescript-eslint|@(typescript-)?eslint\/.+|eslint-(plugin|config|import-resolver)-.+|@[^/]+\/eslint-(plugin|config)(-.+)?)$/;
 
-function preserveKeyOrder(
-  original: Record<string, unknown>,
-  merged: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const key of Object.keys(original)) {
-    result[key] = key in merged ? merged[key] : original[key];
-  }
-  for (const key of Object.keys(merged)) {
-    if (!(key in result)) result[key] = merged[key];
-  }
-  return result;
-}
-
-function removeEslintDeps(deps: Record<string, string>): Record<string, string> {
-  const removed = Object.keys(deps).filter((name) => ESLINT_DEP.test(name));
-  if (removed.length === 0) return deps;
-  warn(`Removing ESLint devDependencies (oxlint replaces them): ${removed.join(', ')}`);
-  return Object.fromEntries(Object.entries(deps).filter(([name]) => !ESLINT_DEP.test(name)));
-}
-
 // ponytail: reads the first number in the range, so "~6.0.3" and "^5.8.0"
 // count as below 7 and "latest" or "catalog:" are skipped. Use semver's
 // minVersion if odd ranges ever show up.
-function warnOnTypescriptMajorBump(range: string | undefined): void {
+function typescriptMajorBumpWarning(range: string | undefined): string | undefined {
   const major = Number(/\d+/.exec(range ?? '')?.[0]);
-  if (Number.isNaN(major) || major >= 7) return;
-  warn(
-    `Upgrading typescript from ${range} to 7. TypeScript 7 drops baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system". If typecheck fails, remove those from tsconfig.json.`,
-  );
+  if (Number.isNaN(major) || major >= 7) return undefined;
+  return `Upgrading typescript from ${range} to 7. TypeScript 7 drops baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system". If typecheck fails, remove those from tsconfig.json.`;
 }

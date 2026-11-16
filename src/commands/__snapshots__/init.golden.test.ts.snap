@@ -1,0 +1,975 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`init output > expo 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec lint-staged
+pnpm run typecheck
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import", "react", "jsx-a11y"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "off",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error",
+    "react/rules-of-hooks": "error",
+    "react/error-boundaries": "warn",
+    "react/immutability": "warn",
+    "react/incompatible-library": "warn",
+    "react/memo-dependencies": "warn",
+    "react/no-deriving-state-in-effects": "warn",
+    "react/preserve-manual-memoization": "warn",
+    "react/purity": "warn",
+    "react/refs": "warn",
+    "react/set-state-in-effect": "warn",
+    "react/set-state-in-render": "warn",
+    "react/static-components": "warn",
+    "react/unsupported-syntax": "warn",
+    "react/use-memo": "warn",
+    "react/void-use-memo": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.{ts,tsx}"],
+      "rules": {
+        "react/rules-of-hooks": "warn"
+      }
+    }
+  ]
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "dependencies": {
+    "expo": "~54.0.0",
+    "react": "^19.0.0"
+  },
+  "name": "demo",
+  "scripts": {
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{js,jsx,cjs,mjs,ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^7.0.2"
+  }
+}
+",
+  "tsconfig.json": "{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "verbatimModuleSyntax": true
+  }
+}
+",
+}
+`;
+
+exports[`init output > express 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec lint-staged
+pnpm run typecheck
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/*.{js,mjs,cjs}",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "warn",
+    "typescript/no-unsafe-call": "warn",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "warn",
+    "typescript/no-unsafe-return": "warn",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error"
+  }
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "dependencies": {
+    "express": "^5.0.0"
+  },
+  "name": "demo",
+  "scripts": {
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^7.0.2"
+  }
+}
+",
+  "tsconfig.json": "{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "verbatimModuleSyntax": true
+  }
+}
+",
+}
+`;
+
+exports[`init output > monorepo-no-root-tsconfig 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec lint-staged
+pnpm run typecheck
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/packages/*/dist/**",
+    "**/*.{js,mjs,cjs}",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error"
+  }
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "name": "monorepo",
+  "scripts": {
+    "typecheck": "turbo run check",
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^7.0.2"
+  }
+}
+",
+  "packages/a/package.json": "{"name":"a"}",
+}
+`;
+
+exports[`init output > next-15.5 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec next typegen
+pnpm exec lint-staged
+pnpm run typecheck
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/*.{js,mjs,cjs}",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import", "react", "jsx-a11y", "nextjs"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error",
+    "react/rules-of-hooks": "error"
+  }
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "dependencies": {
+    "next": "^15.5.0",
+    "react": "^19.0.0"
+  },
+  "name": "demo",
+  "scripts": {
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "next typegen && oxlint .",
+    "lint:fix": "next typegen && oxlint . --fix",
+    "lint:strict": "next typegen && oxlint . --deny-warnings",
+    "prepare": "husky",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^7.0.2"
+  }
+}
+",
+  "tsconfig.json": "{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "verbatimModuleSyntax": true
+  }
+}
+",
+}
+`;
+
+exports[`init output > plain-bare 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec lint-staged
+pnpm run typecheck
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/*.{js,mjs,cjs}",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error"
+  }
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "name": "demo",
+  "scripts": {
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^7.0.2"
+  }
+}
+",
+  "tsconfig.json": "{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "verbatimModuleSyntax": true
+  }
+}
+",
+}
+`;
+
+exports[`init output > v1-upgrade 1`] = `
+{
+  ".editorconfig": "root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+  ".eslintrc.json.bak": "{}
+",
+  ".gitattributes": "* text=auto eol=lf
+*.sh text eol=lf
+",
+  ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+  ".husky/pre-commit": "pnpm exec lint-staged
+pnpm run typecheck
+pnpm run test
+",
+  ".oxlintrc.json": "{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/*.{js,mjs,cjs}",
+    "**/.pnpm-store/**",
+    "**/*.config.*",
+    "**/components/ui/**",
+    "**/.env*",
+    "**/.expo/**"
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "import"],
+  "rules": {
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/no-cycle": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-self-import": "error",
+    "unicorn/no-thenable": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error"
+  }
+}
+",
+  ".prettierignore": "node_modules
+dist
+.next
+build
+.pnpm-store
+*.env
+*.log
+pnpm-lock.yaml
+coverage
+",
+  ".prettierrc": "{
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "tabWidth": 2,
+  "printWidth": 100
+}
+",
+  "commitlint.config.js.bak": "module.exports = {};
+",
+  "commitlint.config.mjs": "export default {
+  extends: ['@commitlint/config-conventional'],
+};
+",
+  "package.json": "{
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "husky": "^9.0.0",
+    "oxlint": "^1.0.0"
+  },
+  "name": "demo",
+  "scripts": {
+    "lint": "oxlint .",
+    "test": "vitest run",
+    "commit": "cz",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:fix": "oxlint . --fix",
+    "lint:strict": "oxlint . --deny-warnings",
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{json,md,css}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxlint",
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  }
+}
+",
+  "tsconfig.json": "{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "verbatimModuleSyntax": true
+  }
+}
+",
+}
+`;

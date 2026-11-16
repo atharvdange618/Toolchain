@@ -10,6 +10,8 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Changed
 
+- `init` resolves dependency versions before writing, so a failed lookup leaves the project untouched. Before this, the config files were already written when the lookup ran.
+- `init` prints its warnings and notes together before writing, and reports 4 steps instead of 8. The files it writes are unchanged.
 - `init` names the workspace imports that type-aware lint can't resolve, meaning those with neither a tsconfig `references` entry in the importing package nor a built `.d.ts`. They report under the `no-unsafe-*` rules until fixed, which is also what `typecheck` reports on that tree, so the config no longer changes to avoid them.
 
 ### Notes
