@@ -1,6 +1,6 @@
 # `doctor` and `update` commands
 
-Status: Step 2 implemented locally and independently reviewed. Created 2026-11-15; completed 2026-11-16 against the merged Step 1 code. The earlier decision-table and `--yes` choices (Q1 to Q7) stand. Latest checks: strict lint, typecheck, 495 passing tests (3 platform/sandbox skips), build, seven smoke cases and repository adoption checks passed. Both issues from the final whole-change review are fixed and passed scoped re-review. No commit or release has been made.
+Status: Step 2 implemented locally and independently reviewed. Created 2026-11-15; completed 2026-11-16 against the merged Step 1 code. The earlier decision-table and `--yes` choices (Q1 to Q7) stand. Latest checks: strict lint, typecheck, 524 passing tests (2 platform/sandbox skips), build, seven smoke cases and repository adoption checks passed. Both issues from the final whole-change review are fixed and passed scoped re-review, and the manifest now records the package manager so hooks survive being checked through a different one. No commit or release has been made.
 
 ## Why
 
@@ -66,6 +66,7 @@ Keep Step 1's six-fixture golden snapshot as the byte-for-byte check. Step 2 mus
 
 ```json
 {
+  "packageManager": "pnpm",
   "entries": {
     ".oxlintrc.json#rules.no-debugger": "<64 lowercase hexadecimal characters>",
     "package.json#scripts.lint": "<64 lowercase hexadecimal characters>"
@@ -74,6 +75,10 @@ Keep Step 1's six-fixture golden snapshot as the byte-for-byte check. Step 2 mus
 ```
 
 This example shows the shape; the angle-bracket values stand for actual hashes. `init` writes it after applying the plan, before install. `scaffold` gets it through `init`. Hashes only, no content; a conflict shows disk against new, not a full three-way diff. A manifest records the generator base, not proof that install or Husky setup succeeded.
+
+`packageManager` records the manager the hooks were generated for. It is absent in manifests written before it was recorded, and readers fall back to detection. Doctor and update resolve the manager as `--pm`, then whatever the project tree names (a lockfile or `devEngines`), then the recorded value, then npm. The tree outranks the record so a manager migration shows the hooks as stale instead of passing. Both commands ignore `npm_config_user_agent`, because the shell that invoked the CLI must not rewrite hooks generated for the project's own manager; `init` still reads it, since a fresh project has no lockfile yet. Update records the manager it resolved.
+
+Write manifest entry paths in sorted order with two-space indentation and a final LF. Emit `packageManager` only when known, and accept only `bun`, `npm`, `pnpm` or `yarn`. The hash rules and path grammar are the file format contract; a later change needs an explicit migration.
 
 Hash with SHA-256, encoded as lowercase hex. Whole-file text normalizes CRLF to LF, with all other whitespace, including the final newline, significant. JSON values use compact JSON with object keys sorted recursively; array order stays significant. This makes formatting and object-key order irrelevant inside a JSON entry. Array-item entries hash the JSON string for that item. Dependency-presence entries hash the JSON literal `true`. Missing is a separate value, never the text `null` or an empty string.
 

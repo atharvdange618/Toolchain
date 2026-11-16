@@ -1,8 +1,27 @@
 import { createHash } from 'node:crypto';
 
+import { type PackageManager, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
+import { isObject } from '../utils/fs.js';
+
 export type Manifest = Record<string, string>;
 
+// The committed base for later `doctor` and `update` runs. `packageManager` is
+// absent in manifests written before it was recorded, so readers fall back to
+// detection. It is not a standalone setting: the project tree still wins.
+export interface ManifestDocument {
+  packageManager?: PackageManager;
+  entries: Manifest;
+}
+
 export const MANIFEST_FILE = '.toolchain.json';
+
+// The two tracked hooks. Doctor and update re-want these from the scripts they
+// keep, and a deleted one needs action because commits would go unchecked.
+export const HOOK_FILES = ['.husky/pre-commit', '.husky/commit-msg'] as const;
+
+export function isHookPath(entryPath: string): boolean {
+  return (HOOK_FILES as readonly string[]).includes(entryPath);
+}
 
 const WHOLE_FILES = new Set([
   '.editorconfig',
@@ -71,11 +90,11 @@ export function hashEntry(entryPath: string, value: string | undefined): string 
   return createHash('sha256').update(normalized).digest('hex');
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function isPackageManager(value: unknown): value is PackageManager {
+  return typeof value === 'string' && (VALID_PACKAGE_MANAGERS as readonly string[]).includes(value);
 }
 
-export function parseManifest(text: string | undefined): Manifest | undefined {
+export function parseManifest(text: string | undefined): ManifestDocument | undefined {
   if (text === undefined) return undefined;
 
   let parsed: unknown;
@@ -96,15 +115,26 @@ export function parseManifest(text: string | undefined): Manifest | undefined {
     }
     entries[entryPath] = hash;
   }
-  return entries;
+
+  const packageManager = parsed['packageManager'];
+  if (packageManager === undefined) return { entries };
+  if (!isPackageManager(packageManager)) {
+    throw new Error(`${MANIFEST_FILE}: invalid packageManager ${JSON.stringify(packageManager)}`);
+  }
+  return { packageManager, entries };
 }
 
-export function serializeManifest(manifest: Manifest): string {
-  parseManifest(JSON.stringify({ entries: manifest }));
+export function serializeManifest(document: ManifestDocument): string {
   const entries = Object.fromEntries(
-    Object.keys(manifest)
+    Object.keys(document.entries)
       .sort()
-      .map((key) => [key, manifest[key]]),
+      .map((key) => [key, document.entries[key]]),
   );
-  return `${JSON.stringify({ entries }, null, 2)}\n`;
+  const ordered: Record<string, unknown> = {};
+  if (document.packageManager !== undefined) ordered['packageManager'] = document.packageManager;
+  ordered['entries'] = entries;
+  const text = `${JSON.stringify(ordered, null, 2)}\n`;
+  // Round-trip so paths, hashes and the manager are validated before anything reaches disk.
+  parseManifest(text);
+  return text;
 }

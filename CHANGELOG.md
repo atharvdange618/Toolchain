@@ -6,7 +6,7 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Added
 
-- `.toolchain.json` records generated-entry hashes on `init` and `scaffold`, giving later updates a shared base without changing the existing generated files.
+- `.toolchain.json` records generated-entry hashes and the package manager used for the hooks on `init` and `scaffold`, giving later updates a shared base without changing the existing generated files. `doctor` and `update` use a lockfile or `devEngines` before that record, and ignore the package manager that invoked them, so checking an npm project through `pnpm dlx` reports no drift.
 - `doctor` reports tracked config drift without writes or network access and exits 1 when entries need action, for use in CI. It checks root dependency declarations and hook sources, not installed tools or Git hook activation.
 - `update` applies safe changes, preserves local edits and deletions, and asks about conflicts. `--yes` keeps unresolved conflicts without recording a choice. It restores missing required devDependencies and installs only when adding them; failed installs need the printed manual retry.
 - Monorepos get the type-aware rules too. `oxlint-tsgolint` follows a package's tsconfig `references` entry to the other package's source, so nothing has to be built first. Before this, `init` turned type-aware lint off for every monorepo.

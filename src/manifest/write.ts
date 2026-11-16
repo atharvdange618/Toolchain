@@ -5,7 +5,6 @@ import {
   copyFileSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -15,8 +14,14 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { applyKeyEntries, type Entry } from '../generators/entry.js';
 import { serializeOxlintConfig } from '../generators/oxlint.js';
+import { hasCode, readOptional } from '../utils/fs.js';
 import * as logger from '../utils/logger.js';
-import { assertEntryPath, MANIFEST_FILE, type Manifest, serializeManifest } from './manifest.js';
+import {
+  assertEntryPath,
+  MANIFEST_FILE,
+  type ManifestDocument,
+  serializeManifest,
+} from './manifest.js';
 import { type Project, type Snapshot, snapshotJson } from './project.js';
 
 const CREATE_ONLY = new Set(['.gitattributes', 'tsconfig.json']);
@@ -72,19 +77,6 @@ export function prepareWrites(project: Project, entries: Entry[]): Entry[] {
   return writes;
 }
 
-function hasCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}
-
-function readOptional(file: string): string | undefined {
-  try {
-    return readFileSync(file, 'utf8');
-  } catch (error) {
-    if (hasCode(error, 'ENOENT')) return undefined;
-    throw error;
-  }
-}
-
 function resolveInside(targetDir: string, file: string): string {
   const root = path.resolve(targetDir);
   const resolved = path.resolve(root, file);
@@ -101,9 +93,12 @@ function resolveInside(targetDir: string, file: string): string {
 }
 
 function assertSafePath(targetDir: string, file: string): void {
-  const resolved = resolveInside(targetDir, file);
-  const root = path.parse(resolved).root;
-  const parts = resolved.slice(root.length).split(path.sep);
+  const root = path.resolve(targetDir);
+  const resolved = resolveInside(root, file);
+  // Walk only the segments this write can create or replace. Ancestors above
+  // the project root are the user's own path, and checking them on every entry
+  // adds syscalls without guarding anything the tool manages.
+  const parts = path.relative(root, resolved).split(path.sep);
   let current = root;
   for (const part of parts) {
     current = path.join(current, part);
@@ -136,12 +131,15 @@ export function assertUnchanged(targetDir: string, snapshot: Snapshot): void {
 }
 
 function atomicReplace(targetDir: string, file: string, content: string): void {
-  assertSafePath(targetDir, file);
   const target = resolveInside(targetDir, file);
   const temporary = path.join(path.dirname(target), `.${path.basename(file)}.${randomUUID()}.tmp`);
   let mode: number | undefined;
   try {
-    mode = lstatSync(target).mode;
+    const stat = lstatSync(target);
+    // The caller's assertSafeTargets walked the whole path. This one guard is
+    // worth repeating here, in the lstat the mode probe already needs.
+    if (stat.isSymbolicLink()) throw new Error(`Refusing symlink in write path: ${target}`);
+    mode = stat.mode;
   } catch (error) {
     if (!hasCode(error, 'ENOENT')) throw error;
   }
@@ -219,8 +217,8 @@ export function applyWrites(
   }
 }
 
-export function writeManifest(targetDir: string, manifest: Manifest): void {
-  const content = serializeManifest(manifest);
+export function writeManifest(targetDir: string, document: ManifestDocument): void {
+  const content = serializeManifest(document);
   assertSafeTargets(targetDir, [MANIFEST_FILE]);
   if (readOptional(resolveInside(targetDir, MANIFEST_FILE)) === content) return;
   atomicReplace(targetDir, MANIFEST_FILE, content);

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { detect, pmExec, workspacePackageDirs } from './project.js';
+import { detect, detectPackageManager, pmExec, workspacePackageDirs } from './project.js';
 
 let dir: string;
 
@@ -153,6 +153,67 @@ describe('detect', () => {
     writePackageJson({ devEngines: { packageManager: { name: 'bun' } } });
 
     expect(detect(dir).packageManager).toBe('bun');
+  });
+});
+
+describe('detectPackageManager', () => {
+  it('reports which signal chose the manager', () => {
+    writePackageJson({});
+    expect(detectPackageManager(dir, {})).toEqual({
+      packageManager: 'npm',
+      source: 'default',
+    });
+
+    touch('yarn.lock');
+    expect(detectPackageManager(dir, {})).toEqual({
+      packageManager: 'yarn',
+      source: 'lockfile',
+    });
+  });
+
+  it('reports devEngines as the source when no lockfile exists', () => {
+    expect(detectPackageManager(dir, { devEngines: { packageManager: { name: 'pnpm' } } })).toEqual(
+      { packageManager: 'pnpm', source: 'devEngines' },
+    );
+  });
+
+  it('treats package-lock.json as an npm lockfile rather than a default', () => {
+    touch('package-lock.json');
+
+    expect(detectPackageManager(dir, {})).toEqual({
+      packageManager: 'npm',
+      source: 'lockfile',
+    });
+  });
+
+  it('accepts npm in devEngines instead of treating it as absent', () => {
+    expect(detectPackageManager(dir, { devEngines: { packageManager: { name: 'npm' } } })).toEqual({
+      packageManager: 'npm',
+      source: 'devEngines',
+    });
+  });
+
+  it('reports the user agent as the source when init is allowed to read it', () => {
+    writePackageJson({});
+    vi.stubEnv('npm_config_user_agent', 'pnpm/9.0.0 node/v20.0.0');
+
+    expect(detectPackageManager(dir, {})).toEqual({
+      packageManager: 'pnpm',
+      source: 'user-agent',
+    });
+  });
+
+  // doctor and update pass useUserAgent: false: the shell that ran the CLI
+  // must not rewrite hooks generated for the project's own manager.
+  it('ignores the user agent when asked, letting the lockfile decide', () => {
+    writePackageJson({});
+    touch('yarn.lock');
+    vi.stubEnv('npm_config_user_agent', 'pnpm/9.0.0 node/v20.0.0');
+
+    expect(detectPackageManager(dir, {}, undefined, { useUserAgent: false })).toEqual({
+      packageManager: 'yarn',
+      source: 'lockfile',
+    });
   });
 });
 

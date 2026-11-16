@@ -38,6 +38,7 @@ describe('chooseConflicts', () => {
       for (const comparison of rows) expect(text).toContain(comparison.path);
       expect(text).toContain('- "local"');
       expect(text).toContain('+ "new"');
+      expect(text).not.toContain('need action');
       return 'keep';
     });
     const choices = await chooseConflicts(rows, { yes: false, isTTY: true });

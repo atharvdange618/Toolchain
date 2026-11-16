@@ -221,9 +221,34 @@ describe('safe writes', () => {
       ).toThrow(/symlink/i);
       expect(read('.prettierrc')).toBe('old');
       expect(fs.existsSync(path.join(dir, '.prettierrc.bak'))).toBe(false);
-      if (file === '.toolchain.json') expect(() => writeManifest(dir, {})).toThrow(/symlink/i);
+      if (file === '.toolchain.json')
+        expect(() => writeManifest(dir, { entries: {} })).toThrow(/symlink/i);
     },
   );
+
+  // Ancestors above the project root belong to the user's machine, not the
+  // tool, so the safety walk starts at the root it was given.
+  it('walks only paths inside the project root, never its ancestors', () => {
+    const nested = path.join(dir, 'outer', 'inner');
+    fs.mkdirSync(nested, { recursive: true });
+    const seen: string[] = [];
+    const lstat = fs.lstatSync;
+    vi.spyOn(fs, 'lstatSync').mockImplementation((target, options) => {
+      seen.push(path.resolve(target.toString()));
+      return lstat(target, options);
+    });
+
+    applyWrites(nested, [{ path: '.husky/pre-commit', want: 'hook' }], new Map(), []);
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const target of seen) {
+      const relative = path.relative(nested, target);
+      expect(relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))).toBe(
+        true,
+      );
+    }
+    expect(fs.readFileSync(path.join(nested, '.husky/pre-commit'), 'utf8')).toBe('hook');
+  });
 
   it.skipIf(process.platform === 'win32')('refuses file symlinks, including the manifest', () => {
     put('outside', 'original');
@@ -232,7 +257,7 @@ describe('safe writes', () => {
     expect(() =>
       applyWrites(dir, [{ path: '.prettierrc', want: 'new' }], project.snapshot, []),
     ).toThrow(/symlink/i);
-    expect(() => writeManifest(dir, {})).toThrow(/symlink/i);
+    expect(() => writeManifest(dir, { entries: {} })).toThrow(/symlink/i);
     expect(read('outside')).toBe('original');
     fs.unlinkSync(path.join(dir, '.toolchain.json'));
     fs.symlinkSync(path.join(dir, 'outside'), path.join(dir, '.prettierrc'));
@@ -310,15 +335,18 @@ describe('safe writes', () => {
 
 describe('writeManifest', () => {
   it('writes deterministic manifest bytes and leaves matching bytes untouched', () => {
-    const manifest = { '.prettierrc': 'a'.repeat(64), '.editorconfig': 'b'.repeat(64) };
-    writeManifest(dir, manifest);
+    const document = {
+      packageManager: 'pnpm' as const,
+      entries: { '.prettierrc': 'a'.repeat(64), '.editorconfig': 'b'.repeat(64) },
+    };
+    writeManifest(dir, document);
     expect(read('.toolchain.json')).toBe(
-      `{\n  "entries": {\n    ".editorconfig": "${'b'.repeat(64)}",\n    ".prettierrc": "${'a'.repeat(64)}"\n  }\n}\n`,
+      `{\n  "packageManager": "pnpm",\n  "entries": {\n    ".editorconfig": "${'b'.repeat(64)}",\n    ".prettierrc": "${'a'.repeat(64)}"\n  }\n}\n`,
     );
     vi.spyOn(fs, 'renameSync').mockImplementation(() => {
       throw new Error('must remain untouched');
     });
-    expect(() => writeManifest(dir, manifest)).not.toThrow();
+    expect(() => writeManifest(dir, document)).not.toThrow();
   });
 
   it('keeps the old manifest if atomic replacement fails', () => {
@@ -326,7 +354,7 @@ describe('writeManifest', () => {
     vi.spyOn(fs, 'renameSync').mockImplementation(() => {
       throw new Error('rename failed');
     });
-    expect(() => writeManifest(dir, {})).toThrow('rename failed');
+    expect(() => writeManifest(dir, { entries: {} })).toThrow('rename failed');
     expect(read('.toolchain.json')).toBe('{"entries":{}}');
     expect(fs.readdirSync(dir).filter((name) => name.includes('.tmp'))).toEqual([]);
   });

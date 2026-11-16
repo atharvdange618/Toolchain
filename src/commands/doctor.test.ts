@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
-import type { Comparison, State } from '../manifest/classify.js';
 import { hashEntry, parseManifest, serializeManifest } from '../manifest/manifest.js';
 import { compareProject, loadProject, trackedEntries } from '../manifest/project.js';
 
@@ -21,7 +20,7 @@ vi.mock('../utils/versions.js', async (importOriginal) => {
 const { execSync } = await import('node:child_process');
 const { getToolchainDeps } = await import('../utils/versions.js');
 const { init } = await import('./init.js');
-const { doctor, reportComparisons } = await import('./doctor.js');
+const { doctor } = await import('./doctor.js');
 
 let dir: string;
 let stdout: MockInstance<typeof console.log>;
@@ -40,11 +39,13 @@ function writeJson(file: string, value: unknown): void {
 }
 
 function recordBase(entryPath: string, value: string): void {
-  const manifest = parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8')) ?? {};
+  const document = parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8')) ?? {
+    entries: {},
+  };
   const hash = hashEntry(entryPath, value);
   if (hash === undefined) throw new Error('Expected hash');
-  manifest[entryPath] = hash;
-  writeFileSync(path.join(dir, '.toolchain.json'), serializeManifest(manifest));
+  document.entries[entryPath] = hash;
+  writeFileSync(path.join(dir, '.toolchain.json'), serializeManifest(document));
 }
 
 function files(root = dir): Record<string, string> {
@@ -110,6 +111,14 @@ describe('doctor', () => {
     expect(output()).toContain('remove its manifest entry and run update');
   });
 
+  it('does not tell a legacy project to edit a manifest it does not have', () => {
+    rmSync(path.join(dir, '.toolchain.json'));
+    rmSync(path.join(dir, '.husky/pre-commit'));
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(1);
+    expect(output()).toContain('restore it from Git, or run update to recreate it.');
+    expect(output()).not.toContain('remove its manifest entry');
+  });
+
   it('requires a missing devDependency even when another dependency section contains it', () => {
     const pkg = json('package.json');
     delete (pkg['devDependencies'] as Record<string, unknown>)['husky'];
@@ -126,10 +135,11 @@ describe('doctor', () => {
       if (state === 'stale') writeFileSync(path.join(dir, '.prettierrc'), 'old\n');
       if (state === 'conflict') writeFileSync(path.join(dir, '.prettierrc'), 'custom\n');
       if (state === 'unknown-origin' || state === 'missing') {
-        const manifest =
-          parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8')) ?? {};
-        delete manifest['.prettierrc'];
-        writeFileSync(path.join(dir, '.toolchain.json'), serializeManifest(manifest));
+        const document = parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8')) ?? {
+          entries: {},
+        };
+        delete document.entries['.prettierrc'];
+        writeFileSync(path.join(dir, '.toolchain.json'), serializeManifest(document));
         if (state === 'missing') rmSync(path.join(dir, '.prettierrc'));
         else writeFileSync(path.join(dir, '.prettierrc'), 'custom\n');
       }
@@ -249,55 +259,5 @@ describe('doctor', () => {
     const exit = vi.spyOn(process, 'exit');
     expect(doctor({ pm: 'pnpm' })).toBe(0);
     expect(exit).not.toHaveBeenCalled();
-  });
-});
-
-describe('reportComparisons', () => {
-  function row(state: State, entryPath = `${state}-entry`): Comparison {
-    return { path: entryPath, state, base: undefined, disk: undefined, want: undefined };
-  }
-
-  it('prints nonempty groups in the required order with sorted paths and totals', () => {
-    const states: State[] = [
-      'stale',
-      'conflict',
-      'unknown-origin',
-      'missing',
-      'removed-locally',
-      'obsolete',
-      'local-edit',
-    ];
-    reportComparisons([
-      row('in-sync'),
-      ...[...states]
-        .reverse()
-        .flatMap((state) => [row(state, `${state}-z`), row(state, `${state}-a`)]),
-    ]);
-    const text = output();
-    let previous = -1;
-    for (const state of states) {
-      const position = text.indexOf(`${state}:`);
-      expect(position).toBeGreaterThan(previous);
-      expect(text.indexOf(`${state}-a`)).toBeLessThan(text.indexOf(`${state}-z`));
-      previous = position;
-    }
-    expect(text).toContain('1 in sync');
-    expect(text).toContain('8 need action');
-  });
-
-  it('prefixes every diff line, including blank lines, and distinguishes absent from null', () => {
-    reportComparisons([
-      { ...row('stale', 'multi'), disk: 'one\r\n\ntwo\n', want: 'three\nfour\n' },
-      { ...row('conflict', 'absent'), disk: undefined, want: 'null' },
-      { ...row('unknown-origin', 'removed'), disk: 'value', want: undefined },
-    ]);
-    expect(output()).toContain('- one\n- \n- two\n- \n+ three\n+ four\n+ \n');
-    expect(output()).toContain('- (absent)\n+ null\n');
-    expect(output()).toContain('- value\n+ (absent)\n');
-  });
-
-  it('omits empty groups and reports zero totals', () => {
-    reportComparisons([]);
-    expect(output()).toBe('0 in sync; 0 need action\n');
   });
 });

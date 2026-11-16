@@ -74,7 +74,7 @@ export function detect(
     hasRootTsconfig: files.exists(path.join(dir, 'tsconfig.json')),
     hasTypeScriptFiles: detectTypeScriptFiles(dir),
     isMonorepo: detectMonorepo(dir, pkg, files),
-    packageManager: detectPackageManager(dir, pkg, files),
+    packageManager: detectPackageManager(dir, pkg, files).packageManager,
     unresolvedWorkspaceTypes: unresolvedWorkspaceTypes(dir, files),
     unsupported: detectUnsupported(allDeps),
   };
@@ -254,27 +254,48 @@ function detectMonorepo(dir: string, pkg: Record<string, unknown>, files: Detect
   return files.exists(workspaceFile) && /^packages:/m.test(files.read(workspaceFile));
 }
 
-function detectPackageManager(
+export type PackageManagerSource = 'default' | 'devEngines' | 'lockfile' | 'user-agent';
+
+export interface PackageManagerDetection {
+  packageManager: PackageManager;
+  // What chose the manager. 'default' means nothing in the project did, so a
+  // recorded manager is better evidence than this answer.
+  source: PackageManagerSource;
+}
+
+// doctor and update pass useUserAgent: false. The shell that invoked the CLI
+// must not decide what the generated hooks contain, because the hooks embed
+// the manager. Init keeps reading it: a fresh project has no lockfile yet.
+export function detectPackageManager(
   dir: string,
   pkg: Record<string, unknown>,
-  files: DetectionFiles,
-): PackageManager {
-  const userAgent = process.env['npm_config_user_agent'] ?? '';
-  if (userAgent.startsWith('pnpm')) return 'pnpm';
-  if (userAgent.startsWith('yarn')) return 'yarn';
-  if (userAgent.startsWith('bun')) return 'bun';
+  files: DetectionFiles = DISK_FILES,
+  options: { useUserAgent?: boolean } = {},
+): PackageManagerDetection {
+  const userAgent =
+    options.useUserAgent === false ? '' : (process.env['npm_config_user_agent'] ?? '');
+  if (userAgent.startsWith('pnpm')) return { packageManager: 'pnpm', source: 'user-agent' };
+  if (userAgent.startsWith('yarn')) return { packageManager: 'yarn', source: 'user-agent' };
+  if (userAgent.startsWith('bun')) return { packageManager: 'bun', source: 'user-agent' };
 
-  if (files.exists(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
-  if (files.exists(path.join(dir, 'yarn.lock'))) return 'yarn';
-  if (files.exists(path.join(dir, 'bun.lockb'))) return 'bun';
+  if (files.exists(path.join(dir, 'pnpm-lock.yaml')))
+    return { packageManager: 'pnpm', source: 'lockfile' };
+  if (files.exists(path.join(dir, 'yarn.lock')))
+    return { packageManager: 'yarn', source: 'lockfile' };
+  if (files.exists(path.join(dir, 'bun.lockb')))
+    return { packageManager: 'bun', source: 'lockfile' };
+  // package-lock.json is an npm signal too. Without it, recorded evidence would
+  // outrank a real npm lockfile and hide a migration away from npm.
+  if (files.exists(path.join(dir, 'package-lock.json')))
+    return { packageManager: 'npm', source: 'lockfile' };
 
   const devEngines = pkg['devEngines'] as Record<string, unknown> | undefined;
   const pmConfig = devEngines?.['packageManager'] as Record<string, unknown> | undefined;
-  if (pmConfig?.['name'] === 'pnpm') return 'pnpm';
-  if (pmConfig?.['name'] === 'yarn') return 'yarn';
-  if (pmConfig?.['name'] === 'bun') return 'bun';
+  const declared = pmConfig?.['name'];
+  if (declared === 'bun' || declared === 'npm' || declared === 'pnpm' || declared === 'yarn')
+    return { packageManager: declared, source: 'devEngines' };
 
-  return 'npm';
+  return { packageManager: 'npm', source: 'default' };
 }
 
 // A root tsconfig with references (create-vite's has "files": [] plus

@@ -42,9 +42,10 @@ src/
 │   ├── classify.ts             # Ordered comparison states and doctor action predicate
 │   ├── project.ts              # Validated snapshots, offline plan and tracked entries
 │   ├── decide.ts               # Actions and the next manifest
+│   ├── report.ts               # Comparison output shared by doctor and update prompts
 │   └── write.ts                # Prepared mutations, backups and atomic writes
 └── utils/
-    ├── fs.ts                   # readJson, writeFile (creates parent dirs)
+    ├── fs.ts                   # readJson, writeFile (creates parent dirs), shared read helpers
     ├── logger.ts               # Colored output with picocolors
     └── versions.ts             # Resolves dependency versions from the npm registry
 scripts/
@@ -86,15 +87,18 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/manifest/`
 
-- `manifest.ts` validates the allowed paths and lowercase SHA-256 hashes, normalizes whole-file CRLF to LF, and hashes JSON with recursively sorted object keys and preserved array order. Serialization sorts manifest paths, uses two-space indentation and ends in LF. Missing differs from literal JSON null; required dependency presence hashes `true` rather than a version.
+- `manifest.ts` validates the allowed paths, lowercase SHA-256 hashes and the optional `packageManager`, normalizes whole-file CRLF to LF, and hashes JSON with recursively sorted object keys and preserved array order. Serialization sorts manifest paths, writes `packageManager` before `entries` when known, uses two-space indentation and ends in LF. Missing differs from literal JSON null; required dependency presence hashes `true` rather than a version. It also owns `HOOK_FILES` and `isHookPath`, the single predicate for the two tracked hooks.
 - `classify.ts` compares base, disk and generated hashes in the spec's order; `decide.ts` maps states and prompt choices to actions and the next base. Compare generated paths plus manifest paths, leaving untracked disk content alone.
+- `report.ts` renders compared rows for doctor's report and update's per-file prompts: one group per state, a diff for stale, conflict and unknown-origin, an optional project footer, and a hook repair phrased for whether a manifest exists.
 - `project.ts` validates JSON containers, snapshots inputs, injects offline dependency placeholders into `buildPlan`, and expands the plan into tracked entries. Track six whole files, oxlint keys/rules/string-array items, generated package scripts, `lint-staged`, `config.commitizen` and required devDependency presence. Create-only `.gitattributes`/`tsconfig.json` and init's ESLint removals are excluded.
-- `write.ts` prepares mutations without writes, preserves untracked values and existing key/item order, rechecks inputs, refuses unsafe targets and symlinks, and completes collision-safe backups before replacing content. Content failure reports completed writes and leaves the old manifest intact. There is no cross-file rollback or concurrent-writer guarantee.
+- `loadProject` resolves the package manager as `--pm`, then a lockfile or `devEngines`, then the manager recorded in `.toolchain.json`, then npm. The tree outranks the record, so a manager migration reports stale hooks instead of passing.
+- `write.ts` prepares mutations without writes, preserves untracked values and existing key/item order, rechecks inputs, refuses unsafe targets and symlinks, and completes collision-safe backups before replacing content. The symlink walk covers only segments from the project root down, so a nested project pays nothing for its own ancestors. Content failure reports completed writes and leaves the old manifest intact. There is no cross-file rollback or concurrent-writer guarantee.
 
 ### `src/detectors/project.ts`
 
 - `detect()` returns `ProjectInfo`: `framework`, `hasReact`, `hasProjectReferences`, `hasRootTsconfig`, `hasTypeScriptFiles`, `isMonorepo`, `packageManager`, `unresolvedWorkspaceTypes`, and `unsupported` when a refused stack is present.
-- Package manager order: `npm_config_user_agent`, then lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`), then `devEngines.packageManager`, then npm.
+- `detectPackageManager()` also returns the signal that chose the manager (`user-agent`, `lockfile`, `devEngines` or `default`). `detect()` reads `npm_config_user_agent` first, then lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`, `package-lock.json`), then `devEngines.packageManager`, then npm. Doctor and update pass `useUserAgent: false`, so the shell that invoked the CLI never decides the hooks; init keeps it, since a fresh project has no lockfile yet.
+- `DetectionFiles` injects the file reads, so doctor and update detect from their validated snapshot instead of touching disk after the fact.
 - Framework: `expo`, then `next`, then `express`, then `react`/`react-dom`, else `plain`. Expo wins because an Expo app depends on react too.
 - Unsupported: `@angular/core`, `vue`, `nuxt`, `svelte`, `@sveltejs/kit` and `astro` (first match in that order).
 - `hasTypeScriptFiles` walks up to six levels, capped at 5000 entries, skipping `node_modules`, build output and `.git`.
@@ -121,11 +125,12 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - Express relaxes four `no-unsafe-*` rules to `warn`.
 - `options.typeAware` is on for every project, monorepos included: tsgolint follows a tsconfig reference to a workspace package's source with nothing built, and a built `.d.ts` resolves without one. `init` warns, and lists the imports, when neither holds, rather than writing weaker rules. The lint scripts don't pass `--type-aware`, so this setting decides.
 - Expo drops `**/*.{js,mjs,cjs}` from `ignorePatterns` (config plugins and Metro config are `.js`, and so are some sources), turns `typescript/no-require-imports` off, sets the 14 React Compiler rules to `warn`, and adds an `overrides` entry dropping `react/rules-of-hooks` to `warn` in `**/*.test.{ts,tsx}`. Every other framework keeps the `.js` ignore and has no `overrides`.
-- The plugins array and Expo's `files` glob are inlined by string replacement after `JSON.stringify`, because Prettier joins short arrays and a fresh `init` must pass its own `prettier --check`.
+- The plugins array and Expo's `files` glob are inlined by string replacement after `JSON.stringify`, because Prettier joins short arrays and a fresh `init` must pass its own `prettier --check`. Only arrays that fit inside print width are inlined, so `update` can serialize a merged user config without emitting a line Prettier would rewrap.
 
 ### `src/generators/husky.ts`
 
 - `generateHuskyHooks(scripts, pm)` returns `{ preCommit, commitMsg }` from the scripts it's given; it reads no file.
+- `withHookWants(entries, scripts, pm)` re-wants the two hook entries from those scripts, and `isHookPath` names them. Doctor and update both use it, so the re-want lives in one place.
 - `pre-commit`: `next typegen` when the final `lint` script starts with it (Next.js 15.5+, since lint-staged calls oxlint directly), then `lint-staged`, then `typecheck` if the script exists, then `test` if the script exists and isn't npm's "no test specified" placeholder.
 - `commit-msg`: `commitlint --edit "$1"`, quoted so paths with spaces work.
 

@@ -149,12 +149,12 @@ export async function init(options: {
   moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
   applyEntries(targetDir, plan.entries);
   try {
-    const manifest: Manifest = {};
+    const entries: Manifest = {};
     for (const entry of trackedEntries(plan)) {
       const hash = hashEntry(entry.path, entry.want ?? undefined);
-      if (hash !== undefined) manifest[entry.path] = hash;
+      if (hash !== undefined) entries[entry.path] = hash;
     }
-    writeManifest(targetDir, manifest);
+    writeManifest(targetDir, { packageManager: pm, entries });
   } catch (error_) {
     error(error_ instanceof Error ? error_.message : 'Failed to record .toolchain.json.');
     return process.exit(1);

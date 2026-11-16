@@ -120,19 +120,43 @@ describe('manifest format', () => {
   });
 
   it('sorts paths with two-space indentation and a final LF, then round-trips real hashes', () => {
-    const manifest = {
+    const entries = {
       'package.json#devDependencies.oxlint': presenceHash,
       '.husky/pre-commit': textHash,
     };
-    const text = serializeManifest(manifest);
+    const text = serializeManifest({ entries });
     expect(text).toBe(
       `{\n  "entries": {\n    ".husky/pre-commit": "${textHash}",\n    "package.json#devDependencies.oxlint": "${presenceHash}"\n  }\n}\n`,
     );
-    expect(parseManifest(text)).toEqual(manifest);
+    expect(parseManifest(text)).toEqual({ entries });
   });
 
+  it('records the package manager beside the entries and omits it when unknown', () => {
+    const text = serializeManifest({
+      packageManager: 'pnpm',
+      entries: { '.prettierrc': textHash },
+    });
+    expect(text).toBe(
+      `{\n  "packageManager": "pnpm",\n  "entries": {\n    ".prettierrc": "${textHash}"\n  }\n}\n`,
+    );
+    expect(parseManifest(text)).toEqual({
+      packageManager: 'pnpm',
+      entries: { '.prettierrc': textHash },
+    });
+    expect(parseManifest(serializeManifest({ entries: {} }))).toEqual({ entries: {} });
+  });
+
+  it.each(['volta', 'pnpm@9', '', 1, null])(
+    'rejects an invalid recorded packageManager %s',
+    (packageManager) => {
+      expect(() => parseManifest(JSON.stringify({ packageManager, entries: {} }))).toThrow(
+        MANIFEST_FILE,
+      );
+    },
+  );
+
   it('accepts an empty entries object', () => {
-    expect(parseManifest('{"entries":{}}')).toEqual({});
+    expect(parseManifest('{"entries":{}}')).toEqual({ entries: {} });
   });
 
   it.each([
@@ -161,7 +185,9 @@ describe('manifest format', () => {
     expect(() => parseManifest(JSON.stringify({ entries: { '../escape': textHash } }))).toThrow(
       MANIFEST_FILE,
     );
-    expect(() => serializeManifest({ '../escape': textHash })).toThrow(MANIFEST_FILE);
-    expect(() => serializeManifest({ '.prettierrc': 'invalid' })).toThrow(MANIFEST_FILE);
+    expect(() => serializeManifest({ entries: { '../escape': textHash } })).toThrow(MANIFEST_FILE);
+    expect(() => serializeManifest({ entries: { '.prettierrc': 'invalid' } })).toThrow(
+      MANIFEST_FILE,
+    );
   });
 });

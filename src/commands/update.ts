@@ -1,8 +1,9 @@
 import { execSync } from 'node:child_process';
 
 import { effectiveScripts, type Entry } from '../generators/entry.js';
-import { generateHuskyHooks } from '../generators/husky.js';
+import { withHookWants } from '../generators/husky.js';
 import { decide, type Decision, nextManifest } from '../manifest/decide.js';
+import { isHookPath } from '../manifest/manifest.js';
 import { compareProject, loadProject, trackedEntries } from '../manifest/project.js';
 import {
   applyWrites,
@@ -15,10 +16,6 @@ import { error, info, success, warn } from '../utils/logger.js';
 import { getToolchainDeps } from '../utils/versions.js';
 import { warnAboutWorkspacePackages, warnAboutWorkspaceTypes } from './init.js';
 import { chooseConflicts } from './update-prompts.js';
-
-function isHook(entryPath: string): boolean {
-  return entryPath === '.husky/pre-commit' || entryPath === '.husky/commit-msg';
-}
 
 function selectedEntries(decisions: Decision[]): Entry[] {
   return decisions
@@ -45,20 +42,16 @@ export async function update(options: {
     );
     const promptOptions = { yes: options.yes ?? false, isTTY: process.stdin.isTTY === true };
     const rows = compareProject(project, trackedEntries(project.plan)).filter(
-      (row) => !isHook(row.path),
+      (row) => !isHookPath(row.path),
     );
     const decisions = decide(rows, await chooseConflicts(rows, promptOptions));
 
     // Hook wants follow the scripts we will keep or write, with the same original base and disk.
     const scripts = effectiveScripts(selectedEntries(decisions), project.pkg['scripts']);
-    const hooks = generateHuskyHooks(scripts, project.pm);
-    const hookEntries = project.plan.entries
-      .filter((entry) => isHook(entry.path))
-      .map((entry) => ({
-        ...entry,
-        want: entry.path === '.husky/pre-commit' ? hooks.preCommit : hooks.commitMsg,
-      }));
-    const hookRows = compareProject(project, hookEntries).filter((row) => isHook(row.path));
+    const hookEntries = withHookWants(project.plan.entries, scripts, project.pm).filter((entry) =>
+      isHookPath(entry.path),
+    );
+    const hookRows = compareProject(project, hookEntries).filter((row) => isHookPath(row.path));
     decisions.push(...decide(hookRows, await chooseConflicts(hookRows, promptOptions)));
 
     const entries = selectedEntries(decisions);
@@ -117,7 +110,7 @@ export async function update(options: {
       }
     }
     try {
-      writeManifest(project.targetDir, manifest);
+      writeManifest(project.targetDir, { packageManager: project.pm, entries: manifest });
     } catch (error_) {
       failed = true;
       error(

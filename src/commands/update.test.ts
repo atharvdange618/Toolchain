@@ -49,11 +49,11 @@ function editPackage(edit: (pkg: Record<string, unknown>) => void): void {
   putJson('package.json', pkg);
 }
 function base(file: string, value: string | undefined): void {
-  const manifest = parseManifest(read('.toolchain.json')) ?? {};
+  const document = parseManifest(read('.toolchain.json')) ?? { entries: {} };
   const hash = hashEntry(file, value);
-  if (hash === undefined) delete manifest[file];
-  else manifest[file] = hash;
-  put('.toolchain.json', serializeManifest(manifest));
+  if (hash === undefined) delete document.entries[file];
+  else document.entries[file] = hash;
+  put('.toolchain.json', serializeManifest(document));
 }
 function stale(file = '.prettierrc'): void {
   put(file, 'old\n');
@@ -109,6 +109,7 @@ beforeEach(async () => {
 afterEach(() => {
   Reflect.deleteProperty(prompts, '_injected');
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   if (originalTTY) Object.defineProperty(process.stdin, 'isTTY', originalTTY);
   else Reflect.deleteProperty(process.stdin, 'isTTY');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -134,7 +135,7 @@ describe('update decisions and adoption', () => {
     put('.prettierrc', 'local\n');
     fs.rmSync(path.join(dir, '.editorconfig'));
     expect(await run()).toBe(0);
-    const manifest = parseManifest(read('.toolchain.json'));
+    const manifest = parseManifest(read('.toolchain.json'))?.entries;
     expect(manifest?.['.prettierrc']).toBeUndefined();
     expect(manifest?.['.editorconfig']).toBe(hashEntry('.editorconfig', read('.editorconfig')));
     expect(manifest?.['.prettierignore']).toBeDefined();
@@ -220,7 +221,9 @@ describe('script-first hooks and root-only scope', () => {
     expect(await run()).toBe(0);
     expect((json('package.json')['scripts'] as Record<string, string>)['test']).toBeUndefined();
     expect(read('.husky/pre-commit')).not.toContain('pnpm run test');
-    expect(parseManifest(read('.toolchain.json'))?.['package.json#scripts.test']).toBeUndefined();
+    expect(
+      parseManifest(read('.toolchain.json'))?.entries['package.json#scripts.test'],
+    ).toBeUndefined();
   });
 
   it.each(['keep', 'overwrite'] as const)(
@@ -285,7 +288,7 @@ describe('script-first hooks and root-only scope', () => {
     expect(await run()).toBe(0);
     for (const file of ['.gitattributes', 'tsconfig.json']) {
       expect(fs.existsSync(path.join(dir, file))).toBe(true);
-      expect(parseManifest(read('.toolchain.json'))?.[file]).toBeUndefined();
+      expect(parseManifest(read('.toolchain.json'))?.entries[file]).toBeUndefined();
     }
     put('.gitattributes', 'custom attributes\n');
     put('tsconfig.json', '{ "compilerOptions": {} }\n');
@@ -341,9 +344,9 @@ describe('dependency restoration and recovery', () => {
       cwd: dir,
       stdio: 'inherit',
     });
-    expect(parseManifest(read('.toolchain.json'))?.['package.json#devDependencies.husky']).toBe(
-      hashEntry('package.json#devDependencies.husky', 'true'),
-    );
+    expect(
+      parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.husky'],
+    ).toBe(hashEntry('package.json#devDependencies.husky', 'true'));
   });
 
   it('restores TypeScript using its fixed range without a registry command', async () => {
@@ -464,7 +467,7 @@ describe('dependency restoration and recovery', () => {
     });
     expect(await run()).toBe(1);
     expect(
-      parseManifest(read('.toolchain.json'))?.['package.json#devDependencies.husky'],
+      parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.husky'],
     ).toBeDefined();
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
     expect(stderr()).toContain('pnpm install');
@@ -579,7 +582,7 @@ describe('dependency restoration and recovery', () => {
       '^1.0.0',
     );
     expect(
-      parseManifest(read('.toolchain.json'))?.['package.json#devDependencies.old-tool'],
+      parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.old-tool'],
     ).toBeUndefined();
     expect(getToolchainDeps).not.toHaveBeenCalled();
     expect(execSync).not.toHaveBeenCalled();
@@ -637,5 +640,38 @@ describe('dependency restoration and recovery', () => {
     expect(files()).toEqual(before);
     expect(exit).not.toHaveBeenCalled();
     expect(stderr()).toContain('Invalid package manager');
+  });
+});
+
+describe('package manager provenance', () => {
+  it('keeps an npm project on npm when doctor and update run through pnpm', async () => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir);
+    putJson('package.json', { name: 'demo' });
+    put('package-lock.json', '{}');
+    await init({ targetDir: dir, yes: true, pm: 'npm' });
+    vi.mocked(execSync).mockClear();
+    vi.mocked(getToolchainDeps).mockClear();
+    const hooks = { commitMsg: read('.husky/commit-msg'), preCommit: read('.husky/pre-commit') };
+    expect(hooks.preCommit).toContain('npm exec --');
+
+    vi.stubEnv('npm_config_user_agent', 'pnpm/9.0.0 node/v20.0.0');
+
+    expect(doctor({ targetDir: dir })).toBe(0);
+    expect(await update({ targetDir: dir, yes: true })).toBe(0);
+    expect(read('.husky/pre-commit')).toBe(hooks.preCommit);
+    expect(read('.husky/commit-msg')).toBe(hooks.commitMsg);
+    expect(parseManifest(read('.toolchain.json'))?.packageManager).toBe('npm');
+  });
+
+  it('reports a lockfile migration as stale hooks and records the new manager', async () => {
+    // init recorded pnpm with no lockfile, then the project moved to npm.
+    put('package-lock.json', '{}');
+    expect(doctor({ targetDir: dir })).toBe(1);
+
+    expect(await update({ targetDir: dir, yes: true })).toBe(0);
+
+    expect(read('.husky/pre-commit')).toContain('npm exec --');
+    expect(parseManifest(read('.toolchain.json'))?.packageManager).toBe('npm');
   });
 });

@@ -59,7 +59,7 @@ pnpm dlx @atharvdange/toolchain init --pm bun
 
 `init` refuses a project built on Vue, Nuxt, Svelte, SvelteKit, Astro or Angular, and exits 1 without writing anything. It also warns, but still writes the configs, when the project has no TypeScript file yet.
 
-`init` also writes `.toolchain.json`, which records hashes of the generated entries for later comparison. Commit it with the configs. For a project already using the toolchain, use `update` to keep local changes.
+`init` also writes `.toolchain.json`, which records hashes of the generated entries and the package manager the hooks were generated for. Commit it with the configs. For a project already using the toolchain, use `update` to keep local changes.
 
 ### `doctor` - Check the current toolchain
 
@@ -69,6 +69,8 @@ pnpm dlx @atharvdange/toolchain doctor --pm pnpm
 ```
 
 `doctor` compares the current generators, disk and `.toolchain.json` without writes, registry lookups, installs or Husky setup. It shows changes by file and entry, with `- disk` and `+ want` lines.
+
+Both commands resolve the package manager from `--pm`, then the project itself (a lockfile or `devEngines`), then the value recorded in `.toolchain.json`, then npm. The package manager that ran the CLI does not count, so `pnpm dlx @atharvdange/toolchain doctor` checks an npm project against its own hooks instead of reporting them stale.
 
 In CI, exit 0 means no tracked entry needs action. Local edits, intentional deletions other than required dependencies/hooks, and obsolete entries pass. Stale, conflicting, unknown-origin or missing entries exit 1, as do missing required devDependencies or hook source files. Invalid input, unsupported stacks and I/O failures also exit 1. A missing manifest alone does not fail if every generated entry matches.
 
@@ -170,7 +172,7 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 | `.husky/pre-commit`               | `lint-staged` + `typecheck` + `test` (when a test script exists); Next.js 15.5+ runs `next typegen` first |
 | `.husky/commit-msg`               | `commitlint`                                                                                              |
 | `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies                                       |
-| `.toolchain.json`                 | Hashes of generated entries for `doctor` and `update`                                                     |
+| `.toolchain.json`                 | Hashes of generated entries and the generated hooks' package manager, for `doctor` and `update`           |
 
 `init` keeps an existing `.gitattributes` or `tsconfig.json`. It renames ESLint configs, an existing `.oxlintrc.json` and other commitlint variants to `.bak`, then writes the generated configs. An existing `commitlint.config.mjs` is replaced. Use `update` to preserve local edits to generated entries.
 
@@ -250,7 +252,7 @@ This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It read
 
 ## Detection logic
 
-- **Package manager**: checks `npm_config_user_agent` first (set by the package manager that invoked the CLI), then lockfiles (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` → bun), then `devEngines` in package.json, else npm
+- **Package manager**: `init` checks `npm_config_user_agent` first (set by the package manager that invoked the CLI), then lockfiles (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` → bun, `package-lock.json` → npm), then `devEngines` in package.json, else npm. `doctor` and `update` skip the user agent and fall back to the manager recorded in `.toolchain.json`
 - **Unsupported stacks**: checks for `@angular/core`, `vue`, `nuxt`, `svelte`, `@sveltejs/kit` and `astro`, and refuses to write anything
 - **TypeScript files**: scans up to six levels deep for `.ts`, `.tsx`, `.mts` or `.cts`, skipping `node_modules`, build output and `.git`
 - **Monorepo**: checks for `workspaces` in package.json or a `packages:` list in `pnpm-workspace.yaml`

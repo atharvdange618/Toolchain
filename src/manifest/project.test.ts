@@ -87,7 +87,7 @@ describe('offline project snapshot', () => {
     write('.editorconfig', 'root = true\r\n');
     write('package.json', { devDependencies: { husky: '^8' } });
     write('.oxlintrc.json', { options: { second: 2, first: 1 } });
-    write('.toolchain.json', serializeManifest({ '.editorconfig': base }));
+    write('.toolchain.json', serializeManifest({ entries: { '.editorconfig': base } }));
     const project = loadProject(dir);
     const rows = compareProject(project, [
       { path: '.editorconfig', want: 'root = true\n' },
@@ -198,8 +198,10 @@ describe('offline project snapshot', () => {
     write(
       '.toolchain.json',
       serializeManifest({
-        [old]: hashEntry(old, '"warn"')!,
-        [edited]: hashEntry(edited, '"warn"')!,
+        entries: {
+          [old]: hashEntry(old, '"warn"')!,
+          [edited]: hashEntry(edited, '"warn"')!,
+        },
       }),
     );
     write('.oxlintrc.json', { rules: { 'edited.rule': 'error' } });
@@ -337,5 +339,50 @@ describe('project validation', () => {
   it.each(['package.json', '.oxlintrc.json', '.toolchain.json'])('names %s on bad JSON', (file) => {
     write(file, '{');
     expect(() => loadProject(dir)).toThrow(file);
+  });
+});
+
+describe('package manager resolution', () => {
+  function record(packageManager: 'bun' | 'npm' | 'pnpm' | 'yarn'): void {
+    write('.toolchain.json', serializeManifest({ packageManager, entries: {} }));
+  }
+
+  it('uses the recorded manager when nothing in the tree names one', () => {
+    record('pnpm');
+
+    expect(loadProject(dir).pm).toBe('pnpm');
+  });
+
+  it.each([
+    ['pnpm-lock.yaml', 'pnpm'],
+    ['yarn.lock', 'yarn'],
+    ['bun.lockb', 'bun'],
+    ['package-lock.json', 'npm'],
+  ] as const)('lets %s outrank the recorded manager', (lockfile, expected) => {
+    record('yarn');
+    write(lockfile, '');
+
+    expect(loadProject(dir).pm).toBe(expected);
+  });
+
+  it('lets devEngines outrank the recorded manager', () => {
+    record('pnpm');
+    write('package.json', { name: 'demo', devEngines: { packageManager: { name: 'npm' } } });
+
+    expect(loadProject(dir).pm).toBe('npm');
+  });
+
+  it('lets --pm outrank both the tree and the record', () => {
+    record('pnpm');
+    write('package-lock.json', '{}');
+
+    expect(loadProject(dir, 'bun').pm).toBe('bun');
+  });
+
+  it('ignores the invoking user agent so hooks are compared against the project', () => {
+    record('pnpm');
+    vi.stubEnv('npm_config_user_agent', 'yarn/4.0.0 node/v20.0.0');
+
+    expect(loadProject(dir).pm).toBe('pnpm');
   });
 });

@@ -1,3 +1,5 @@
+import { isHookPath } from './manifest.js';
+
 export type State =
   | 'in-sync'
   | 'stale'
@@ -38,8 +40,6 @@ export function needsAction(row: Comparison): boolean {
   return (
     row.want !== undefined &&
     row.disk === undefined &&
-    (row.path === '.husky/pre-commit' ||
-      row.path === '.husky/commit-msg' ||
-      row.path.startsWith('package.json#devDependencies.'))
+    (isHookPath(row.path) || row.path.startsWith('package.json#devDependencies.'))
   );
 }

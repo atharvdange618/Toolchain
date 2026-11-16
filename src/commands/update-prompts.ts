@@ -2,7 +2,7 @@ import prompts from 'prompts';
 
 import type { Comparison } from '../manifest/classify.js';
 import type { Choice } from '../manifest/decide.js';
-import { reportComparisons } from './doctor.js';
+import { reportComparisons } from '../manifest/report.js';
 
 function onCancel(): never {
   throw new Error('Update cancelled. No files were changed.');
@@ -30,7 +30,7 @@ export async function chooseConflicts(
   }
 
   for (const [file, group] of files) {
-    reportComparisons(group);
+    reportComparisons(group, { footer: false });
     const response = await prompts(
       {
         type: 'select',

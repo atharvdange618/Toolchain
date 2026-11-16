@@ -35,7 +35,7 @@ afterEach(() => {
 
 describe('init manifest', () => {
   function readManifest(): Record<string, string> | undefined {
-    return parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8'));
+    return parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8'))?.entries;
   }
 
   function failOnExit(): void {
@@ -81,6 +81,9 @@ describe('init manifest', () => {
     expect(execSync).toHaveBeenCalledWith('pnpm install', expect.anything());
     const manifest = readManifest();
     expect(Object.keys(manifest ?? {})).toEqual(Object.keys(manifest ?? {}).sort());
+    expect(
+      parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8'))?.packageManager,
+    ).toBe('pnpm');
   });
 
   it('hashes generator wants rather than rereading modified disk contents', async () => {

@@ -3,14 +3,17 @@ import path from 'node:path';
 
 import {
   detect,
+  detectPackageManager,
   type DetectionFiles,
   type PackageManager,
+  type PackageManagerDetection,
   type ProjectInfo,
   unsupportedMessage,
   VALID_PACKAGE_MANAGERS,
 } from '../detectors/project.js';
 import type { Entry, Plan } from '../generators/entry.js';
 import { buildPlan } from '../generators/plan.js';
+import { hasCode, isObject } from '../utils/fs.js';
 import { TOOLCHAIN_DEP_NAMES } from '../utils/versions.js';
 import { classify, type Comparison } from './classify.js';
 import {
@@ -35,8 +38,17 @@ export interface Project {
 
 const parsedSnapshots = new WeakMap<Snapshot, Map<string, Record<string, unknown>>>();
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+// `--pm` wins, then anything the project tree says, then the manager recorded
+// last time, then npm. The tree outranks the record so a manager migration is
+// reported as drift instead of hidden behind a matching manifest.
+function resolvePackageManager(
+  requestedPm: string | undefined,
+  detected: PackageManagerDetection,
+  recorded: PackageManager | undefined,
+): PackageManager {
+  if (requestedPm !== undefined) return requestedPm as PackageManager;
+  if (detected.source !== 'default') return detected.packageManager;
+  return recorded ?? detected.packageManager;
 }
 
 function object(
@@ -119,7 +131,7 @@ export function loadProject(targetDir: string, requestedPm?: string): Project {
       try {
         text = readFileSync(file, 'utf8');
       } catch (error) {
-        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        if (!hasCode(error, 'ENOENT')) {
           throw new Error(`${relative}: could not read file`, { cause: error });
         }
       }
@@ -160,10 +172,11 @@ export function loadProject(targetDir: string, requestedPm?: string): Project {
   }
   const info = detect(targetDir, files);
   if (info.unsupported) throw new Error(unsupportedMessage(info.unsupported));
-  const pm = (requestedPm as PackageManager | undefined) ?? info.packageManager;
+  const manifest = parseManifest(read(path.join(targetDir, MANIFEST_FILE)));
+  const detected = detectPackageManager(targetDir, pkg, files, { useUserAgent: false });
+  const pm = resolvePackageManager(requestedPm, detected, manifest?.packageManager);
   const oxlintPath = path.join(targetDir, '.oxlintrc.json');
   if (read(oxlintPath) !== undefined) validateOxlint(files.json(oxlintPath));
-  const manifest = parseManifest(read(path.join(targetDir, MANIFEST_FILE)));
   const devDependencies = pkg['devDependencies'];
   const deps = Object.fromEntries(
     TOOLCHAIN_DEP_NAMES.map((name) => {
@@ -175,15 +188,18 @@ export function loadProject(targetDir: string, requestedPm?: string): Project {
       ];
     }),
   );
-  const plan = buildPlan(targetDir, info, pm, deps, pkg);
+  // The plan and the recorded manager share the resolved manager, not the
+  // environment's, so hooks and the manifest can't disagree.
+  const plannedInfo: ProjectInfo = { ...info, packageManager: pm };
+  const plan = buildPlan(targetDir, plannedInfo, pm, deps, pkg);
   for (const entry of [
     ...plan.entries,
-    ...Object.keys(manifest ?? {}).map((entryPath) => ({ path: entryPath })),
+    ...Object.keys(manifest?.entries ?? {}).map((entryPath) => ({ path: entryPath })),
   ]) {
     read(path.join(targetDir, entry.path.split('#')[0] ?? entry.path));
   }
   parsedSnapshots.set(snapshot, parsed);
-  return { targetDir, info, pm, pkg, manifest, snapshot, plan };
+  return { targetDir, info: plannedInfo, pm, pkg, manifest: manifest?.entries, snapshot, plan };
 }
 
 export function trackedEntries(plan: Plan): Entry[] {
