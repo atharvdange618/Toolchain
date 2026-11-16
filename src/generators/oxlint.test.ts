@@ -86,6 +86,66 @@ describe('generateOxlintConfig for Expo', () => {
 });
 
 describe('serializeOxlintConfig', () => {
+  it('serializes a config without plugins', () => {
+    expect(JSON.parse(serializeOxlintConfig({ rules: {} }))).toEqual({ rules: {} });
+  });
+
+  it('serializes all override files without replacing another files array', () => {
+    const config = {
+      files: ['root.ts'],
+      overrides: [
+        { files: ['**/*.test.ts'], rules: {} },
+        { files: ['**/*.spec.ts', '**/*.spec.tsx'], rules: {} },
+        { files: ['**/[ab].ts', '**/"quoted".ts', '**/back\\slash.ts'], rules: {} },
+      ],
+    };
+    const json = serializeOxlintConfig(config);
+    expect(JSON.parse(json)).toEqual(config);
+    expect(json).toContain('"files": ["**/*.spec.ts", "**/*.spec.tsx"]');
+  });
+
+  it('keeps short custom multi-glob overrides Prettier-clean', async () => {
+    const config = {
+      overrides: [{ files: ['**/*.spec.ts', '**/*.spec.tsx'], rules: {} }],
+    };
+    const json = serializeOxlintConfig(config);
+    expect(JSON.parse(json)).toEqual(config);
+    const options = { ...(JSON.parse(PRETTIERRC) as Record<string, unknown>), parser: 'json' };
+    await expect(prettier.check(json, options)).resolves.toBe(true);
+  });
+
+  // `update` serializes merged user configs, where an override can be wider
+  // than printWidth. Inlining it would emit a line `prettier --check` rejects.
+  it('leaves an over-width files array multiline and Prettier-clean', async () => {
+    const config = {
+      overrides: [
+        {
+          files: [
+            'src/features/dashboard/**/*.test.tsx',
+            'src/features/settings/**/*.spec.tsx',
+            'src/features/billing/**/*.stories.tsx',
+            'src/features/reports/**/*.test.tsx',
+          ],
+          rules: {},
+        },
+      ],
+    };
+    const json = serializeOxlintConfig(config);
+    expect(JSON.parse(json)).toEqual(config);
+    expect(json).not.toContain('"files": ["src/features');
+    const options = { ...(JSON.parse(PRETTIERRC) as Record<string, unknown>), parser: 'json' };
+    await expect(prettier.check(json, options)).resolves.toBe(true);
+  });
+
+  it('inlines a short files array nested inside a rule option', async () => {
+    const config = { rules: { 'custom/rule': { files: ['a.ts'] } } };
+    const json = serializeOxlintConfig(config);
+    expect(JSON.parse(json)).toEqual(config);
+    expect(json).toContain('"files": ["a.ts"]');
+    const options = { ...(JSON.parse(PRETTIERRC) as Record<string, unknown>), parser: 'json' };
+    await expect(prettier.check(json, options)).resolves.toBe(true);
+  });
+
   // update will serialize a config it merged, with no ProjectInfo to hand.
   it('inlines short arrays without a framework', () => {
     const json = serializeOxlintConfig({

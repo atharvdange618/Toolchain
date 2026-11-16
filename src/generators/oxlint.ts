@@ -137,18 +137,23 @@ function buildOxlintConfig(info: ProjectInfo): Record<string, unknown> {
 }
 
 // JSON.stringify puts every array item on its own line, but Prettier joins
-// an array that fits in printWidth onto one. Inline the short arrays (the
-// plugins list and Expo's test glob) so a fresh `init` passes its own
-// `prettier --check`.
+// an array that fits in printWidth onto one. Inline only those arrays (the
+// plugins list, Expo's test glob) so a fresh `init` passes its own
+// `prettier --check`. A wider array keeps Prettier's multiline form: `update`
+// runs this on merged user configs, where a long `files` list would otherwise
+// produce one over-width line that `format:check` rejects.
+const PRINT_WIDTH = 100;
+
 export function serializeOxlintConfig(config: Record<string, unknown>): string {
-  const inlinePlugins = `"plugins": ${JSON.stringify(config['plugins']).replaceAll(',', ', ')}`;
-  let json = JSON.stringify(config, null, 2).replace(/"plugins": \[[^\]]*\]/, inlinePlugins);
-  const overrides = config['overrides'];
-  if (Array.isArray(overrides)) {
-    const first: unknown = overrides[0];
-    const files =
-      typeof first === 'object' && first !== null && 'files' in first ? first.files : undefined;
-    json = json.replace(/"files": \[[^\]]*\]/, `"files": ${JSON.stringify(files)}`);
-  }
-  return `${json}\n`;
+  const json = JSON.stringify(config, null, 2);
+  return `${json.replace(
+    /"(plugins|files)": \[((?:\s*"(?:\\.|[^"\\])*"\s*,?)*\s*)\]/g,
+    (_match, key: string, items: string, offset: number) => {
+      const values = JSON.parse(`[${items}]`) as string[];
+      const inline = `"${key}": [${values.map((item) => JSON.stringify(item)).join(', ')}]`;
+      const indent = offset - (json.lastIndexOf('\n', offset) + 1);
+      const comma = json[offset + _match.length] === ',' ? 1 : 0;
+      return indent + inline.length + comma <= PRINT_WIDTH ? inline : _match;
+    },
+  )}\n`;
 }

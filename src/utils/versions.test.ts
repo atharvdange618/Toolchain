@@ -126,6 +126,24 @@ describe('getTypescriptVersion', () => {
 });
 
 describe('getToolchainDeps', () => {
+  it('resolves only selected required names, keeping TypeScript offline', async () => {
+    const { getToolchainDeps } = await import('./versions.js');
+    mockedExecSync.mockReturnValue(npmView('9.9.9'));
+    expect(getToolchainDeps(['husky', 'typescript'])).toEqual({
+      husky: '^9.9.9',
+      typescript: '^7.0.2',
+    });
+    expect(mockedExecSync.mock.calls).toEqual([
+      ['npm view husky time dist-tags --json', { encoding: 'utf8' }],
+    ]);
+  });
+
+  it('rejects unknown names before doing any lookups', async () => {
+    const { getToolchainDeps } = await import('./versions.js');
+    expect(() => getToolchainDeps(['husky', 'not-a-toolchain-dep'])).toThrow('not-a-toolchain-dep');
+    expect(mockedExecSync).not.toHaveBeenCalled();
+    expect(getToolchainDeps([])).toEqual({});
+  });
   it('returns caret versions for the toolchain packages', async () => {
     const { getToolchainDeps } = await import('./versions.js');
     mockedExecSync.mockReturnValue(npmView('9.9.9'));

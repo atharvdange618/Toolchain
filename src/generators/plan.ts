@@ -20,7 +20,13 @@ import { generateTsconfig } from './tsconfig.js';
 
 // Everything init would write, read from the project but written nowhere.
 // The version lookup runs here, so a failed one leaves the project untouched.
-export function buildPlan(targetDir: string, info: ProjectInfo, pm: PackageManager): Plan {
+export function buildPlan(
+  targetDir: string,
+  info: ProjectInfo,
+  pm: PackageManager,
+  deps?: Record<string, string>,
+  pkg: Record<string, unknown> = readJson(path.join(targetDir, 'package.json')),
+): Plan {
   const entries: Entry[] = [
     { path: '.editorconfig', want: EDITORCONFIG },
     { path: '.prettierrc', want: PRETTIERRC },
@@ -58,8 +64,7 @@ export function buildPlan(targetDir: string, info: ProjectInfo, pm: PackageManag
     entries.push({ path: 'tsconfig.json', want: generateTsconfig() });
   }
 
-  const pkg = readJson(path.join(targetDir, 'package.json'));
-  const packagePlan = planPackageJson(pkg, info, getToolchainDeps());
+  const packagePlan = planPackageJson(pkg, info, deps ?? getToolchainDeps());
   entries.push(...packagePlan.entries);
   messages.push(...packagePlan.messages);
 

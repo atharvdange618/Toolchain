@@ -8,6 +8,8 @@ A CLI that sets up a dev toolchain (oxlint, Prettier, Husky, lint-staged, commit
 
 - Published as `@atharvdange/toolchain` on npm
 - `pnpm dlx @atharvdange/toolchain init` sets up an existing project
+- `pnpm dlx @atharvdange/toolchain doctor` checks tracked declarations and hook sources without writes or network access
+- `pnpm dlx @atharvdange/toolchain update` applies generator changes while keeping local edits
 - `pnpm dlx @atharvdange/toolchain scaffold <name> --template <type>` creates a new one
 - Supported stacks: Next.js, Vite + React, Expo / React Native, Express, plain TS, pnpm and Turbo monorepos. Vue, Nuxt, Svelte, SvelteKit, Astro and Angular are refused, because their checkers need the TypeScript compiler API that TS 7 no longer ships.
 
@@ -17,14 +19,17 @@ v2 replaced ESLint with oxlint, because typescript-eslint pinned TypeScript belo
 
 ```
 src/
-├── index.ts                    # CLI entry point (Commander): init, scaffold
+├── index.ts                    # CLI entry point (Commander): init, scaffold, doctor, update
 ├── commands/
 │   ├── init.ts                 # Sets up the toolchain in an existing project
-│   └── scaffold.ts             # Creates a project from a template, then runs init
+│   ├── scaffold.ts             # Creates a project from a template, then runs init
+│   ├── doctor.ts               # Read-only comparison and CI exit code
+│   ├── update.ts               # Decisions, writes, optional install, manifest
+│   └── update-prompts.ts       # File-grouped conflict choices and TTY checks
 ├── detectors/
 │   └── project.ts              # Framework, package manager, monorepo, tsconfig, unsupported stacks, TS file scan
 ├── generators/
-│   ├── entry.ts                # Entry/Plan types, applyEntries (the one writer), effectiveScripts
+│   ├── entry.ts                # Entry/Plan types, init writer, shared JSON mutations, effectiveScripts
 │   ├── plan.ts                 # buildPlan: every entry init would write, written nowhere
 │   ├── oxlint.ts               # .oxlintrc.json per framework
 │   ├── husky.ts                # .husky/pre-commit and .husky/commit-msg
@@ -32,8 +37,15 @@ src/
 │   ├── static-configs.ts       # .editorconfig, .prettierrc, .prettierignore, commitlint
 │   ├── tsconfig.ts             # Strict tsconfig: flat or Node app
 │   └── templates/              # One file per scaffold template
+├── manifest/
+│   ├── manifest.ts             # Paths, normalized hashes, parsing and serialization
+│   ├── classify.ts             # Ordered comparison states and doctor action predicate
+│   ├── project.ts              # Validated snapshots, offline plan and tracked entries
+│   ├── decide.ts               # Actions and the next manifest
+│   ├── report.ts               # Comparison output shared by doctor and update prompts
+│   └── write.ts                # Prepared mutations, backups and atomic writes
 └── utils/
-    ├── fs.ts                   # readJson, writeFile (creates parent dirs)
+    ├── fs.ts                   # readJson, writeFile (creates parent dirs), shared read helpers
     ├── logger.ts               # Colored output with picocolors
     └── versions.ts             # Resolves dependency versions from the npm registry
 scripts/
@@ -44,11 +56,11 @@ scripts/
 
 ### `src/index.ts`
 
-Registers `init` (`--yes`, `--pm`) and `scaffold <project-name>` (`--template`, `--pm`, `--yes`). Reads the version from `package.json` at runtime. Uses `parseAsync`, so a rejected action prints one line instead of a stack trace.
+Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--pm`, `--yes`), `doctor` (`--pm`) and `update` (`--yes`, `--pm`). Doctor and update return codes set `process.exitCode`. Reads the version from `package.json` at runtime. Uses `parseAsync`, so a rejected action prints one line instead of a stack trace.
 
 ### `src/commands/init.ts`
 
-Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, install, `husky`. No generator writes to disk; `buildPlan` resolves dependency versions before anything is written, so a failed lookup leaves the project untouched.
+Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; `buildPlan` resolves dependency versions before anything is written, so a failed lookup leaves the project untouched.
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.
@@ -64,10 +76,29 @@ Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prom
 
 Validates the name and template, picks the package manager (`pnpm-monorepo` and `turbo` require pnpm), and runs the template's generator. `react` and `nextjs` call `create-vite` and `create-next-app` through `pmDlx()`; the rest write files directly. Then it runs `git init` if needed, calls `init({ yes: true })`, and runs `lint:fix` and `format` so the new project passes its own checks.
 
+### `src/commands/doctor.ts` and `src/commands/update.ts`
+
+- Both use the validated offline snapshot and root-only plan from `manifest/project.ts`. They share unsupported-stack checks and `--pm` validation with the existing commands. No workspace package is rewritten.
+- Doctor compares hooks generated from current disk scripts. It performs no writes, registry lookups, install or Husky setup. Stale, conflict, unknown-origin and missing entries fail, as do absent required devDependencies and hook sources. Other local deletions, edits and obsolete entries pass. Declarations and hook sources do not prove installation or Git hook activation.
+- Update decides non-hook entries first, then generates hook wants from the scripts those decisions keep or write. It finishes both prompt stages and resolves only missing required dependencies before writes. Intentional script and hook deletions stay deleted; missing required dependencies are restored. Existing ranges and dependencies the generator dropped stay untouched.
+- Interactive keep records the current generator hash; `--yes` keeps conflicts and unknown origins without a recorded choice, so doctor can still fail. Cancellation or a required prompt without a terminal aborts before writes.
+- Update backs up whole files before conflict overwrites, prepares atomic writes and preserves modes. It runs `<pm> install` only after adding required devDependencies, then saves the applied-content manifest even if install failed. A failed install exits 1 and needs the printed manual retry; rerunning update will not retry it. Update runs no separate Husky setup command, though install can run the project's existing `prepare` lifecycle.
+- A missing tracked hook fails doctor with its repair: restore it from Git or remove that path from the manifest and run update. Update does not reverse intentional hook deletions on its own.
+
+### `src/manifest/`
+
+- `manifest.ts` validates the allowed paths, lowercase SHA-256 hashes and the optional `packageManager`, normalizes whole-file CRLF to LF, and hashes JSON with recursively sorted object keys and preserved array order. Serialization sorts manifest paths, writes `packageManager` before `entries` when known, uses two-space indentation and ends in LF. Missing differs from literal JSON null; required dependency presence hashes `true` rather than a version. It also owns `HOOK_FILES` and `isHookPath`, the single predicate for the two tracked hooks.
+- `classify.ts` compares base, disk and generated hashes in the spec's order; `decide.ts` maps states and prompt choices to actions and the next base. Compare generated paths plus manifest paths, leaving untracked disk content alone.
+- `report.ts` renders compared rows for doctor's report and update's per-file prompts: one group per state, a diff for stale, conflict and unknown-origin, an optional project footer, and a hook repair phrased for whether a manifest exists.
+- `project.ts` validates JSON containers, snapshots inputs, injects offline dependency placeholders into `buildPlan`, and expands the plan into tracked entries. Track six whole files, oxlint keys/rules/string-array items, generated package scripts, `lint-staged`, `config.commitizen` and required devDependency presence. Create-only `.gitattributes`/`tsconfig.json` and init's ESLint removals are excluded.
+- `loadProject` resolves the package manager as `--pm`, then a lockfile or `devEngines`, then the manager recorded in `.toolchain.json`, then npm. The tree outranks the record, so a manager migration reports stale hooks instead of passing.
+- `write.ts` prepares mutations without writes, preserves untracked values and existing key/item order, rechecks inputs, refuses unsafe targets and symlinks, and completes collision-safe backups before replacing content. The symlink walk covers only segments from the project root down, so a nested project pays nothing for its own ancestors. Content failure reports completed writes and leaves the old manifest intact. There is no cross-file rollback or concurrent-writer guarantee.
+
 ### `src/detectors/project.ts`
 
 - `detect()` returns `ProjectInfo`: `framework`, `hasReact`, `hasProjectReferences`, `hasRootTsconfig`, `hasTypeScriptFiles`, `isMonorepo`, `packageManager`, `unresolvedWorkspaceTypes`, and `unsupported` when a refused stack is present.
-- Package manager order: `npm_config_user_agent`, then lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`), then `devEngines.packageManager`, then npm.
+- `detectPackageManager()` also returns the signal that chose the manager (`user-agent`, `lockfile`, `devEngines` or `default`). `detect()` reads `npm_config_user_agent` first, then lockfiles (`pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`, `package-lock.json`), then `devEngines.packageManager`, then npm. Doctor and update pass `useUserAgent: false`, so the shell that invoked the CLI never decides the hooks; init keeps it, since a fresh project has no lockfile yet.
+- `DetectionFiles` injects the file reads, so doctor and update detect from their validated snapshot instead of touching disk after the fact.
 - Framework: `expo`, then `next`, then `express`, then `react`/`react-dom`, else `plain`. Expo wins because an Expo app depends on react too.
 - Unsupported: `@angular/core`, `vue`, `nuxt`, `svelte`, `@sveltejs/kit` and `astro` (first match in that order).
 - `hasTypeScriptFiles` walks up to six levels, capped at 5000 entries, skipping `node_modules`, build output and `.git`.
@@ -83,7 +114,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/plan.ts`
 
-`buildPlan(targetDir, info, pm)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once and writes nothing.
+`buildPlan(targetDir, info, pm, deps?, pkg?)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once unless supplied and writes nothing. Doctor/update supply dependency placeholders and the validated package snapshot to avoid a registry lookup.
 
 ### `src/generators/oxlint.ts`
 
@@ -94,11 +125,12 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - Express relaxes four `no-unsafe-*` rules to `warn`.
 - `options.typeAware` is on for every project, monorepos included: tsgolint follows a tsconfig reference to a workspace package's source with nothing built, and a built `.d.ts` resolves without one. `init` warns, and lists the imports, when neither holds, rather than writing weaker rules. The lint scripts don't pass `--type-aware`, so this setting decides.
 - Expo drops `**/*.{js,mjs,cjs}` from `ignorePatterns` (config plugins and Metro config are `.js`, and so are some sources), turns `typescript/no-require-imports` off, sets the 14 React Compiler rules to `warn`, and adds an `overrides` entry dropping `react/rules-of-hooks` to `warn` in `**/*.test.{ts,tsx}`. Every other framework keeps the `.js` ignore and has no `overrides`.
-- The plugins array and Expo's `files` glob are inlined by string replacement after `JSON.stringify`, because Prettier joins short arrays and a fresh `init` must pass its own `prettier --check`.
+- The plugins array and Expo's `files` glob are inlined by string replacement after `JSON.stringify`, because Prettier joins short arrays and a fresh `init` must pass its own `prettier --check`. Only arrays that fit inside print width are inlined, so `update` can serialize a merged user config without emitting a line Prettier would rewrap.
 
 ### `src/generators/husky.ts`
 
 - `generateHuskyHooks(scripts, pm)` returns `{ preCommit, commitMsg }` from the scripts it's given; it reads no file.
+- `withHookWants(entries, scripts, pm)` re-wants the two hook entries from those scripts, and `isHookPath` names them. Doctor and update both use it, so the re-want lives in one place.
 - `pre-commit`: `next typegen` when the final `lint` script starts with it (Next.js 15.5+, since lint-staged calls oxlint directly), then `lint-staged`, then `typecheck` if the script exists, then `test` if the script exists and isn't npm's "no test specified" placeholder.
 - `commit-msg`: `commitlint --edit "$1"`, quoted so paths with spaces work.
 
@@ -119,7 +151,7 @@ Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches t
 
 ### `src/utils/versions.ts`
 
-Asks npm for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. TypeScript is fixed at `^7.0.2`.
+Asks npm for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. TypeScript is fixed at `^7.0.2`. `TOOLCHAIN_DEP_NAMES` supports offline planning; `getToolchainDeps(names?)` resolves only the selected missing packages for update, or all packages for init.
 
 ## Key Design Decisions
 
@@ -130,6 +162,7 @@ Asks npm for the newest stable release at least a day old (`pickSettledVersion`)
 5. Refuse frameworks whose checker needs the TS compiler API instead of warning, because `tsc --noEmit` exits 0 on them and the user would see a green check that means nothing. A `.js`-only project gets a warning and the configs, since it can grow into TypeScript.
 6. `.js` stays in the lint run only for Expo, where config plugins and Metro config are plain JavaScript.
 7. Type-aware lint is on in monorepos too, since `oxlint-tsgolint` follows tsconfig references to source and needs no build. A workspace import that resolves to neither a reference nor a built `.d.ts` got a config with the rules off at first, and that lost: the check read `dist/` on the machine running `init`, so a dev machine with a recent build wrote the rules on for CI and teammates too. The config is now the same everywhere and `init` names the imports that won't resolve.
+8. Commit `.toolchain.json` as the shared generator base. Use doctor/update for an existing setup; rerunning init replaces generated configs. Do not infer a base from a package version or stamp unknown disk content without a choice.
 
 ## Build & Development
 
@@ -144,9 +177,12 @@ pnpm run format       # Prettier
 pnpm run format:check # Prettier, check only
 pnpm test             # Vitest
 pnpm run smoke        # Scaffold every template from the packed CLI and check it (slow, needs network)
+node bin/index.js doctor --pm pnpm # Check this repo's generated entries after build
 ```
 
 This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.husky/commit-msg` are what `generateOxlintConfig` and `generateHuskyHooks` produce for this repo (a plain pnpm project), byte for byte, so they double as a check on the generators. Don't hand-edit them: when you change `oxlint.ts` or `husky.ts`, update these files to the new output in the same commit. The pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
+
+The repo's `.toolchain.json` was adopted through the built update command after comparing generator bytes. Keep it with generator changes and check doctor afterward. Smoke runs doctor with an explicit per-case package manager after lint/typecheck/format/build, recording `logs/doctor.log`; the explicit manager prevents the parent pnpm environment from selecting hooks for an npm case.
 
 CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
@@ -154,18 +190,19 @@ Entry point: `bin/index.js` imports `dist/index.js`, built from `src/index.ts`.
 
 ## Generated Output (by `init`)
 
-| File                     | Source                                                   |
-| ------------------------ | -------------------------------------------------------- |
-| `.editorconfig`          | `static-configs.ts`                                      |
-| `.prettierrc`            | `static-configs.ts`                                      |
-| `.prettierignore`        | `static-configs.ts`                                      |
-| `.gitattributes`         | `static-configs.ts`, only when the project has none      |
-| `commitlint.config.mjs`  | `static-configs.ts`                                      |
-| `.oxlintrc.json`         | `generators/oxlint.ts`, per framework                    |
-| `tsconfig.json`          | `generators/tsconfig.ts`, only when none exists          |
-| `.husky/pre-commit`      | `generators/husky.ts`                                    |
-| `.husky/commit-msg`      | `generators/husky.ts`                                    |
-| `package.json` (updated) | `generators/package-json.ts`: scripts, deps, lint-staged |
+| File                     | Source                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `.editorconfig`          | `static-configs.ts`                                                                       |
+| `.prettierrc`            | `static-configs.ts`                                                                       |
+| `.prettierignore`        | `static-configs.ts`                                                                       |
+| `.gitattributes`         | `static-configs.ts`, only when the project has none                                       |
+| `commitlint.config.mjs`  | `static-configs.ts`                                                                       |
+| `.oxlintrc.json`         | `generators/oxlint.ts`, per framework                                                     |
+| `tsconfig.json`          | `generators/tsconfig.ts`, only when none exists                                           |
+| `.husky/pre-commit`      | `generators/husky.ts`                                                                     |
+| `.husky/commit-msg`      | `generators/husky.ts`                                                                     |
+| `package.json` (updated) | `generators/package-json.ts`: scripts, deps, lint-staged                                  |
+| `.toolchain.json`        | `manifest/project.ts` tracked entries and `manifest/manifest.ts` hashes, recorded by init |
 
 ## Releasing
 

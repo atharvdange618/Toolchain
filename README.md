@@ -59,6 +59,47 @@ pnpm dlx @atharvdange/toolchain init --pm bun
 
 `init` refuses a project built on Vue, Nuxt, Svelte, SvelteKit, Astro or Angular, and exits 1 without writing anything. It also warns, but still writes the configs, when the project has no TypeScript file yet.
 
+`init` also writes `.toolchain.json`, which records hashes of the generated entries and the package manager the hooks were generated for. Commit it with the configs. For a project already using the toolchain, use `update` to keep local changes.
+
+### `doctor` - Check the current toolchain
+
+```bash
+pnpm dlx @atharvdange/toolchain doctor
+pnpm dlx @atharvdange/toolchain doctor --pm pnpm
+```
+
+`doctor` compares the current generators, disk and `.toolchain.json` without writes, registry lookups, installs or Husky setup. It shows changes by file and entry, with `- disk` and `+ want` lines.
+
+Both commands resolve the package manager from `--pm`, then the project itself (a lockfile or `devEngines`), then the value recorded in `.toolchain.json`, then npm. The package manager that ran the CLI does not count, so `pnpm dlx @atharvdange/toolchain doctor` checks an npm project against its own hooks instead of reporting them stale.
+
+In CI, exit 0 means no tracked entry needs action. Local edits, intentional deletions other than required dependencies/hooks, and obsolete entries pass. Stale, conflicting, unknown-origin or missing entries exit 1, as do missing required devDependencies or hook source files. Invalid input, unsupported stacks and I/O failures also exit 1. A missing manifest alone does not fail if every generated entry matches.
+
+The check covers root `devDependencies` declarations, not installed packages, working tools or registry versions. It checks `.husky/pre-commit` and `.husky/commit-msg`, not `.husky/_` or Git hook activation. Create-only `.gitattributes` and `tsconfig.json` stay outside the manifest and doctor checks. In a monorepo, both commands only change or compare the root toolchain; workspace warnings do not migrate packages.
+
+### `update` - Apply changes and keep local edits
+
+```bash
+# Review conflicts interactively
+pnpm dlx @atharvdange/toolchain update
+
+# Apply safe changes and keep unresolved conflicts
+pnpm dlx @atharvdange/toolchain update --yes --pm pnpm
+```
+
+`update` applies stale or missing entries, preserves local edits and deletions, and prompts for conflicting or unknown-origin entries by file. Choices are keep all, overwrite all differing or review one by one; keep is the default. An interactive keep records the current generator as the base. `--yes` keeps those entries without recording a choice, so `update` can exit 0 while `doctor` still exits 1. Without `--yes`, a required prompt needs a terminal; cancellation aborts before writes.
+
+For a project without `.toolchain.json`, run `doctor` first, then interactive `update`. Matching entries get a base automatically; differing entries need your choice because there is no earlier base. Review the diff and commit the manifest with the resulting configs. Re-running `init` would replace generated configs and scripts, so use it only when you want that reset.
+
+Deleted scripts and hooks stay deleted. A deleted required hook still fails `doctor`: restore it from Git, or remove just its path from `.toolchain.json`'s `entries` object and run `update` to recreate it. Hooks follow the scripts you keep, including deleted `typecheck` scripts. Missing required devDependencies are the exception: `update` restores them even after a local deletion, keeps existing version ranges, and never removes a dependency.
+
+`update` resolves only missing required packages before writes and runs `<pm> install` only after adding their declarations. It does not move configs aside or run a separate Husky setup command. That install can run an existing `prepare` lifecycle script, including `husky`. Conflict overwrites get a full-file backup (`.bak`, then `.bak.1`, and so on); existing backups survive. There is no cross-file rollback or support for concurrent writers.
+
+If install fails, `update` still saves the manifest for the applied content, exits 1 and prints the manual retry command, such as `pnpm install`. Run that command yourself: another `update` sees the declarations and will not retry install. A green `doctor` does not prove install succeeded.
+
+If a content write fails, `update` retains the old manifest and runs no install. When new dependency declarations were already written, it prints the selected manager's manual install command. Run that command yourself too: rerunning `update` will not install those declared dependencies.
+
+Both commands accept `--pm bun|npm|pnpm|yarn`; otherwise they use the [existing detection order](#detection-logic).
+
 ### `scaffold` - Create a new project
 
 ```bash
@@ -131,8 +172,9 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 | `.husky/pre-commit`               | `lint-staged` + `typecheck` + `test` (when a test script exists); Next.js 15.5+ runs `next typegen` first |
 | `.husky/commit-msg`               | `commitlint`                                                                                              |
 | `package.json`                    | Scripts, `lint-staged` config, `config.commitizen`, devDependencies                                       |
+| `.toolchain.json`                 | Hashes of generated entries and the generated hooks' package manager, for `doctor` and `update`           |
 
-`init` keeps an existing `.gitattributes`, `tsconfig.json` or commitlint config rather than overwrite it, and renames other ESLint, oxlint and commitlint configs to `.bak` so custom rules survive.
+`init` keeps an existing `.gitattributes` or `tsconfig.json`. It renames ESLint configs, an existing `.oxlintrc.json` and other commitlint variants to `.bak`, then writes the generated configs. An existing `commitlint.config.mjs` is replaced. Use `update` to preserve local edits to generated entries.
 
 ## Scripts it adds
 
@@ -210,7 +252,7 @@ This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It read
 
 ## Detection logic
 
-- **Package manager**: checks `npm_config_user_agent` first (set by the package manager that invoked the CLI), then lockfiles (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` → bun), then `devEngines` in package.json, else npm
+- **Package manager**: `init` checks `npm_config_user_agent` first (set by the package manager that invoked the CLI), then lockfiles (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `bun.lockb` → bun, `package-lock.json` → npm), then `devEngines` in package.json, else npm. `doctor` and `update` skip the user agent and fall back to the manager recorded in `.toolchain.json`
 - **Unsupported stacks**: checks for `@angular/core`, `vue`, `nuxt`, `svelte`, `@sveltejs/kit` and `astro`, and refuses to write anything
 - **TypeScript files**: scans up to six levels deep for `.ts`, `.tsx`, `.mts` or `.cts`, skipping `node_modules`, build output and `.git`
 - **Monorepo**: checks for `workspaces` in package.json or a `packages:` list in `pnpm-workspace.yaml`
@@ -218,15 +260,16 @@ This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It read
 
 ## Upgrading from 2.1 or 2.0
 
-Re-run `init` in the project:
+Adopt the manifest and review changes with:
 
 ```bash
-pnpm dlx @atharvdange/toolchain@latest init
+pnpm dlx @atharvdange/toolchain@latest doctor
+pnpm dlx @atharvdange/toolchain@latest update
 ```
 
-From 2.0, it writes `.gitattributes` (unless one exists), adds the second `oxlint` pass to `lint-staged`, and switches an Expo project to the Expo config and glob.
+Without a manifest, differing existing entries appear as unknown-origin. Review them before choosing overwrite or keep. `update --yes` preserves them but leaves them needing action in `doctor`.
 
-From 2.1, a monorepo picks up type-aware lint, which 2.1 left off. Nothing else changes: scripts, `tsconfig.json` and dependencies stay as they are. If `init` names workspace imports that don't resolve, add the dependency to the importing package's `tsconfig.json` `references`, as described under [Lint rules](#lint-rules).
+From 2.0, the generated changes include the second `oxlint` pass in `lint-staged` and the Expo config and glob. From 2.1, a monorepo can pick up type-aware lint, which 2.1 left off. If workspace warnings name imports that don't resolve, add the dependency to the importing package's `tsconfig.json` `references`, as described under [Lint rules](#lint-rules). Existing dependency ranges stay unchanged; handle version upgrades separately.
 
 Full notes for both are in [CHANGELOG.md](CHANGELOG.md).
 

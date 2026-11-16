@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateHuskyHooks } from './husky.js';
+import { generateHuskyHooks, withHookWants } from './husky.js';
 
 function hooksFor(pkg: Record<string, unknown>): { commitMsg: string; preCommit: string } {
   return generateHuskyHooks(pkg['scripts'] as Record<string, string> | undefined, 'pnpm');
@@ -56,5 +56,22 @@ describe('generateHuskyHooks pre-commit', () => {
 describe('generateHuskyHooks commit-msg', () => {
   it('quotes the message file path so a path with spaces stays one argument', () => {
     expect(hooksFor({ name: 'demo' }).commitMsg).toBe('pnpm exec commitlint --edit "$1"\n');
+  });
+});
+
+describe('withHookWants', () => {
+  it('re-wants only the hooks and leaves every other entry untouched', () => {
+    const entries = [
+      { path: '.prettierrc', want: 'generated' },
+      { path: '.husky/pre-commit', want: 'old hook' },
+      { path: '.husky/commit-msg', want: 'old msg' },
+    ];
+    const hooks = generateHuskyHooks({ test: 'vitest' }, 'npm');
+
+    expect(withHookWants(entries, { test: 'vitest' }, 'npm')).toEqual([
+      { path: '.prettierrc', want: 'generated' },
+      { path: '.husky/pre-commit', want: hooks.preCommit },
+      { path: '.husky/commit-msg', want: hooks.commitMsg },
+    ]);
   });
 });

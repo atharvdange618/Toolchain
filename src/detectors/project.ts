@@ -18,6 +18,15 @@ export interface UnsupportedStack {
   package: string;
 }
 
+export function unsupportedMessage(stack: UnsupportedStack): string {
+  return [
+    `Unsupported project: ${stack.name} (found "${stack.package}" in package.json).`,
+    `  ${stack.name} checks its components with ${stack.checker}, which needs TypeScript's compiler API,`,
+    '  and TypeScript 7 no longer ships one, so "tsc --noEmit" would check none of them.',
+    '  Keep this project on TypeScript 6: npm i -D typescript@npm:@typescript/typescript6',
+  ].join('\n');
+}
+
 export interface ProjectInfo {
   framework: Framework;
   hasProjectReferences: boolean;
@@ -34,24 +43,39 @@ export interface ProjectInfo {
   unsupported?: UnsupportedStack | undefined;
 }
 
-export function detect(dir: string = process.cwd()): ProjectInfo {
+export interface DetectionFiles {
+  exists(file: string): boolean;
+  read(file: string): string;
+  json(file: string): Record<string, unknown>;
+}
+
+const DISK_FILES: DetectionFiles = {
+  exists: existsSync,
+  read: (file) => readFileSync(file, 'utf8'),
+  json: readJson,
+};
+
+export function detect(
+  dir: string = process.cwd(),
+  files: DetectionFiles = DISK_FILES,
+): ProjectInfo {
   const pkgPath = path.join(dir, 'package.json');
-  if (!existsSync(pkgPath)) {
+  if (!files.exists(pkgPath)) {
     throw new Error(
       'No package.json found in current directory. Run this command from the root of your project.',
     );
   }
-  const pkg = readJson(pkgPath);
+  const pkg = files.json(pkgPath);
   const allDeps = getAllDeps(pkg);
   return {
     framework: detectFramework(allDeps),
-    hasProjectReferences: detectProjectReferences(dir),
+    hasProjectReferences: detectProjectReferences(dir, files),
     hasReact: !!allDeps['react'] || !!allDeps['react-dom'],
-    hasRootTsconfig: existsSync(path.join(dir, 'tsconfig.json')),
+    hasRootTsconfig: files.exists(path.join(dir, 'tsconfig.json')),
     hasTypeScriptFiles: detectTypeScriptFiles(dir),
-    isMonorepo: detectMonorepo(dir, pkg),
-    packageManager: detectPackageManager(dir, pkg),
-    unresolvedWorkspaceTypes: unresolvedWorkspaceTypes(dir),
+    isMonorepo: detectMonorepo(dir, pkg, files),
+    packageManager: detectPackageManager(dir, pkg, files).packageManager,
+    unresolvedWorkspaceTypes: unresolvedWorkspaceTypes(dir, files),
     unsupported: detectUnsupported(allDeps),
   };
 }
@@ -67,15 +91,15 @@ export function pmExec(pm: PackageManager): string {
 // ponytail: handles exact paths and one-level "dir/*" patterns, which is
 // what pnpm, npm and turbo templates use; "**" and "!" patterns are skipped.
 // Use a glob library if a real repo needs them.
-export function workspacePackageDirs(dir: string): string[] {
+export function workspacePackageDirs(dir: string, files: DetectionFiles = DISK_FILES): string[] {
   const dirs: string[] = [];
-  for (const pattern of workspacePatterns(dir)) {
+  for (const pattern of workspacePatterns(dir, files)) {
     if (pattern.includes('**') || pattern.startsWith('!')) continue;
     const clean = pattern.replace(/^\.\//, '').replace(/\/$/, '');
     const candidates = clean.endsWith('/*')
       ? listDirs(path.join(dir, clean.slice(0, -2))).map((name) => `${clean.slice(0, -2)}/${name}`)
       : [clean];
-    dirs.push(...candidates.filter((rel) => existsSync(path.join(dir, rel, 'package.json'))));
+    dirs.push(...candidates.filter((rel) => files.exists(path.join(dir, rel, 'package.json'))));
   }
   return dirs;
 }
@@ -88,10 +112,13 @@ export function workspacePackageDirs(dir: string): string[] {
 // ponytail: package.json fields only. A package that exposes types through an
 // "exports" map alone counts as resolvable; check the map if a real repo shows
 // up with false positives.
-export function unresolvedWorkspaceTypes(dir: string): string[] {
+export function unresolvedWorkspaceTypes(
+  dir: string,
+  files: DetectionFiles = DISK_FILES,
+): string[] {
   const packages = new Map<string, { dir: string; pkg: Record<string, unknown> }>();
-  for (const rel of workspacePackageDirs(dir)) {
-    const pkg = readJson(path.join(dir, rel, 'package.json'));
+  for (const rel of workspacePackageDirs(dir, files)) {
+    const pkg = files.json(path.join(dir, rel, 'package.json'));
     const name = pkg['name'];
     if (typeof name === 'string' && name !== '') packages.set(name, { dir: rel, pkg });
   }
@@ -101,9 +128,11 @@ export function unresolvedWorkspaceTypes(dir: string): string[] {
     const tsconfigPath = path.join(dir, entry.dir, 'tsconfig.json');
     // No tsconfig of its own means the root config (or none) covers it, so
     // init can't tell which references apply.
-    if (!existsSync(tsconfigPath)) continue;
+    if (!files.exists(tsconfigPath)) continue;
     const referenced = new Set(
-      tsconfigReferences(tsconfigPath).map((rel) => pathKey(path.resolve(dir, entry.dir, rel))),
+      tsconfigReferences(tsconfigPath, files).map((rel) =>
+        pathKey(path.resolve(dir, entry.dir, rel)),
+      ),
     );
     const deps = {
       ...(entry.pkg['dependencies'] as Record<string, string> | undefined),
@@ -113,7 +142,7 @@ export function unresolvedWorkspaceTypes(dir: string): string[] {
       const dep = packages.get(depName);
       if (!dep) continue;
       if (referenced.has(pathKey(path.join(dir, dep.dir)))) continue;
-      if (hasBuiltTypes(path.join(dir, dep.dir), dep.pkg)) continue;
+      if (hasBuiltTypes(path.join(dir, dep.dir), dep.pkg, files)) continue;
       unresolved.push(`${name} -> ${depName}`);
     }
   }
@@ -216,32 +245,57 @@ function detectTypeScriptFiles(dir: string): boolean {
   return walk(dir, 0);
 }
 
-function detectMonorepo(dir: string, pkg: Record<string, unknown>): boolean {
+function detectMonorepo(dir: string, pkg: Record<string, unknown>, files: DetectionFiles): boolean {
   // Check for workspaces key in package.json (npm/yarn)
   if ('workspaces' in pkg) return true;
   // Check pnpm-workspace.yaml for a packages list. The file alone isn't
   // enough: it can hold only settings, like the allowBuilds v1 of this tool wrote.
   const workspaceFile = path.join(dir, 'pnpm-workspace.yaml');
-  return existsSync(workspaceFile) && /^packages:/m.test(readFileSync(workspaceFile, 'utf8'));
+  return files.exists(workspaceFile) && /^packages:/m.test(files.read(workspaceFile));
 }
 
-function detectPackageManager(dir: string, pkg: Record<string, unknown>): PackageManager {
-  const userAgent = process.env['npm_config_user_agent'] ?? '';
-  if (userAgent.startsWith('pnpm')) return 'pnpm';
-  if (userAgent.startsWith('yarn')) return 'yarn';
-  if (userAgent.startsWith('bun')) return 'bun';
+export type PackageManagerSource = 'default' | 'devEngines' | 'lockfile' | 'user-agent';
 
-  if (existsSync(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
-  if (existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
-  if (existsSync(path.join(dir, 'bun.lockb'))) return 'bun';
+export interface PackageManagerDetection {
+  packageManager: PackageManager;
+  // What chose the manager. 'default' means nothing in the project did, so a
+  // recorded manager is better evidence than this answer.
+  source: PackageManagerSource;
+}
+
+// doctor and update pass useUserAgent: false. The shell that invoked the CLI
+// must not decide what the generated hooks contain, because the hooks embed
+// the manager. Init keeps reading it: a fresh project has no lockfile yet.
+export function detectPackageManager(
+  dir: string,
+  pkg: Record<string, unknown>,
+  files: DetectionFiles = DISK_FILES,
+  options: { useUserAgent?: boolean } = {},
+): PackageManagerDetection {
+  const userAgent =
+    options.useUserAgent === false ? '' : (process.env['npm_config_user_agent'] ?? '');
+  if (userAgent.startsWith('pnpm')) return { packageManager: 'pnpm', source: 'user-agent' };
+  if (userAgent.startsWith('yarn')) return { packageManager: 'yarn', source: 'user-agent' };
+  if (userAgent.startsWith('bun')) return { packageManager: 'bun', source: 'user-agent' };
+
+  if (files.exists(path.join(dir, 'pnpm-lock.yaml')))
+    return { packageManager: 'pnpm', source: 'lockfile' };
+  if (files.exists(path.join(dir, 'yarn.lock')))
+    return { packageManager: 'yarn', source: 'lockfile' };
+  if (files.exists(path.join(dir, 'bun.lockb')))
+    return { packageManager: 'bun', source: 'lockfile' };
+  // package-lock.json is an npm signal too. Without it, recorded evidence would
+  // outrank a real npm lockfile and hide a migration away from npm.
+  if (files.exists(path.join(dir, 'package-lock.json')))
+    return { packageManager: 'npm', source: 'lockfile' };
 
   const devEngines = pkg['devEngines'] as Record<string, unknown> | undefined;
   const pmConfig = devEngines?.['packageManager'] as Record<string, unknown> | undefined;
-  if (pmConfig?.['name'] === 'pnpm') return 'pnpm';
-  if (pmConfig?.['name'] === 'yarn') return 'yarn';
-  if (pmConfig?.['name'] === 'bun') return 'bun';
+  const declared = pmConfig?.['name'];
+  if (declared === 'bun' || declared === 'npm' || declared === 'pnpm' || declared === 'yarn')
+    return { packageManager: declared, source: 'devEngines' };
 
-  return 'npm';
+  return { packageManager: 'npm', source: 'default' };
 }
 
 // A root tsconfig with references (create-vite's has "files": [] plus
@@ -252,16 +306,16 @@ function detectPackageManager(dir: string, pkg: Record<string, unknown>): Packag
 // JSON.parse rejects comments. A commented-out references entry gives a
 // false positive; switch to typescript's parseConfigFileTextToJson if that
 // ever matters.
-function detectProjectReferences(dir: string): boolean {
+function detectProjectReferences(dir: string, files: DetectionFiles): boolean {
   const tsconfigPath = path.join(dir, 'tsconfig.json');
-  if (!existsSync(tsconfigPath)) return false;
-  return /"references"\s*:\s*\[\s*\{/.test(readFileSync(tsconfigPath, 'utf8'));
+  if (!files.exists(tsconfigPath)) return false;
+  return /"references"\s*:\s*\[\s*\{/.test(files.read(tsconfigPath));
 }
 
 // ponytail: regex over the raw text, like detectProjectReferences, because
 // tsconfig is JSONC. A commented-out entry is read as a real one.
-function tsconfigReferences(tsconfigPath: string): string[] {
-  const array = /"references"\s*:\s*\[([\s\S]*?)\]/.exec(readFileSync(tsconfigPath, 'utf8'))?.[1];
+function tsconfigReferences(tsconfigPath: string, files: DetectionFiles): string[] {
+  const array = /"references"\s*:\s*\[([\s\S]*?)\]/.exec(files.read(tsconfigPath))?.[1];
   if (!array) return [];
   return [...array.matchAll(/"path"\s*:\s*"([^"]+)"/g)].flatMap((match) =>
     match[1] ? [match[1]] : [],
@@ -270,7 +324,11 @@ function tsconfigReferences(tsconfigPath: string): string[] {
 
 // The file TypeScript reads the package's types from. A package with neither
 // field, or with source and no build, resolves without one.
-function hasBuiltTypes(packageDir: string, pkg: Record<string, unknown>): boolean {
+function hasBuiltTypes(
+  packageDir: string,
+  pkg: Record<string, unknown>,
+  files: DetectionFiles,
+): boolean {
   const types = pkg['types'] ?? pkg['typings'];
   const main = pkg['main'];
   const entry =
@@ -279,7 +337,7 @@ function hasBuiltTypes(packageDir: string, pkg: Record<string, unknown>): boolea
       : typeof main === 'string'
         ? main.replace(/\.js$/, '.d.ts')
         : undefined;
-  return entry === undefined || existsSync(path.join(packageDir, entry));
+  return entry === undefined || files.exists(path.join(packageDir, entry));
 }
 
 // Reference paths and package folders compare as resolved paths, and Windows
@@ -305,8 +363,8 @@ function listDirs(dir: string): string[] {
 
 // ponytail: line-based read of pnpm-workspace.yaml's packages list, so a
 // flow-style list ("packages: [a, b]") is missed. Parse YAML if one shows up.
-function workspacePatterns(dir: string): string[] {
-  const pkg = readJson(path.join(dir, 'package.json'));
+function workspacePatterns(dir: string, files: DetectionFiles): string[] {
+  const pkg = files.json(path.join(dir, 'package.json'));
   const workspaces = pkg['workspaces'];
   if (Array.isArray(workspaces))
     return workspaces.filter((w): w is string => typeof w === 'string');
@@ -315,8 +373,8 @@ function workspacePatterns(dir: string): string[] {
     if (Array.isArray(list)) return list.filter((w): w is string => typeof w === 'string');
   }
   const workspaceFile = path.join(dir, 'pnpm-workspace.yaml');
-  if (!existsSync(workspaceFile)) return [];
-  const lines = readFileSync(workspaceFile, 'utf8').split(/\r?\n/);
+  if (!files.exists(workspaceFile)) return [];
+  const lines = files.read(workspaceFile).split(/\r?\n/);
   const start = lines.findIndex((line) => /^packages:\s*$/.test(line));
   if (start === -1) return [];
   const patterns: string[] = [];

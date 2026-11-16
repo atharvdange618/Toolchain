@@ -1,4 +1,5 @@
 import { type PackageManager, pmExec } from '../detectors/project.js';
+import type { Entry } from './entry.js';
 
 // `npm init` writes this placeholder, which always exits 1.
 const NPM_PLACEHOLDER_TEST = 'no test specified';
@@ -23,4 +24,19 @@ export function generateHuskyHooks(
     commitMsg: `${pmExec(pm)} commitlint --edit "$1"\n`,
     preCommit: `${typegen ? `${pmExec(pm)} next typegen\n` : ''}${pmExec(pm)} lint-staged\n${typecheck ? `${pm} run typecheck\n` : ''}${runTests ? `${pm} run test\n` : ''}`,
   };
+}
+
+// Both commands compare hooks generated from the scripts they will keep or
+// write, so the re-want lives here once. The plan's other entries pass through.
+export function withHookWants(
+  entries: Entry[],
+  scripts: Record<string, string> | undefined,
+  pm: PackageManager,
+): Entry[] {
+  const hooks = generateHuskyHooks(scripts, pm);
+  return entries.map((entry) => {
+    if (entry.path === '.husky/pre-commit') return { ...entry, want: hooks.preCommit };
+    if (entry.path === '.husky/commit-msg') return { ...entry, want: hooks.commitMsg };
+    return entry;
+  });
 }
