@@ -11,18 +11,10 @@ import {
   VALID_PACKAGE_MANAGERS,
   workspacePackageDirs,
 } from '../detectors/project.js';
-import { writeHuskyHooks } from '../generators/husky.js';
-import { generateOxlintConfig } from '../generators/oxlint.js';
-import { ESLINT_DEP, updatePackageJson } from '../generators/package-json.js';
-import {
-  COMMITLINT_CONFIG,
-  EDITORCONFIG,
-  GITATTRIBUTES,
-  PRETTIERIGNORE,
-  PRETTIERRC,
-} from '../generators/static-configs.js';
-import { generateTsconfig } from '../generators/tsconfig.js';
-import { readJson, writeFile } from '../utils/fs.js';
+import { applyEntries, type Plan } from '../generators/entry.js';
+import { ESLINT_DEP } from '../generators/package-json.js';
+import { buildPlan } from '../generators/plan.js';
+import { readJson } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
 // v2 lints with oxlint, so an ESLint config left in the project does nothing.
@@ -122,60 +114,33 @@ export async function init(options: {
     }
   }
 
-  step(2, 'Writing config files...');
-  writeFile(path.join(targetDir, '.editorconfig'), EDITORCONFIG);
-  success('.editorconfig');
-  writeFile(path.join(targetDir, '.prettierrc'), PRETTIERRC);
-  success('.prettierrc');
-  writeFile(path.join(targetDir, '.prettierignore'), PRETTIERIGNORE);
-  success('.prettierignore');
-  // An existing file may carry LFS filters or per-language rules, so it stays.
-  if (existsSync(path.join(targetDir, '.gitattributes'))) {
-    info('.gitattributes already exists, leaving it alone (add "* text=auto eol=lf" if missing)');
-  } else {
-    writeFile(path.join(targetDir, '.gitattributes'), GITATTRIBUTES);
-    success('.gitattributes');
-  }
-  moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
-  writeFile(path.join(targetDir, 'commitlint.config.mjs'), COMMITLINT_CONFIG);
-  success('commitlint.config.mjs');
-
-  step(3, 'Generating oxlint config...');
-  moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
-  writeFile(path.join(targetDir, '.oxlintrc.json'), generateOxlintConfig(projectInfo));
-  success('.oxlintrc.json');
-
-  step(4, 'Generating TypeScript config...');
-  if (projectInfo.hasRootTsconfig) {
-    info('tsconfig.json already exists, skipping (preserving existing config)');
-  } else if (projectInfo.isMonorepo) {
-    // An empty root config makes tsc check every package with the wrong
-    // options, and init can't tell which packages build with tsc.
-    info('No root tsconfig.json in this monorepo, skipping (each package keeps its own)');
-  } else {
-    writeFile(path.join(targetDir, 'tsconfig.json'), generateTsconfig());
-    success('tsconfig.json');
-  }
-
-  step(5, 'Updating package.json...');
+  // Planned in full before any write, so a failed version lookup leaves the
+  // project as it was.
+  let plan: Plan;
   try {
-    updatePackageJson(targetDir, projectInfo);
+    plan = buildPlan(targetDir, projectInfo, pm);
   } catch (error_) {
     error(
       error_ instanceof Error ? error_.message : 'Failed to resolve toolchain dependency versions.',
     );
-    process.exit(1);
+    return process.exit(1);
+  }
+  for (const message of plan.messages) {
+    if (message.level === 'warn') warn(message.text);
+    else info(message.text);
+  }
+
+  step(2, 'Writing config files...');
+  moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
+  moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
+  applyEntries(targetDir, plan.entries);
+  for (const entry of plan.entries) {
+    if (!entry.path.startsWith('package.json#')) success(entry.path);
   }
   success('package.json updated with scripts, lint-staged, and devDependencies');
   if (projectInfo.isMonorepo) warnAboutWorkspacePackages(targetDir);
 
-  // After package.json, so the hook sees the final scripts.
-  step(6, 'Writing Husky hooks...');
-  writeHuskyHooks(targetDir, pm);
-  success('.husky/pre-commit');
-  success('.husky/commit-msg');
-
-  step(7, `Installing dependencies with ${pm}...`);
+  step(3, `Installing dependencies with ${pm}...`);
   try {
     execSync(`${pm} install`, { cwd: targetDir, stdio: 'inherit' });
   } catch {
@@ -184,7 +149,7 @@ export async function init(options: {
   }
   success('Dependencies installed');
 
-  step(8, 'Initializing Husky...');
+  step(4, 'Initializing Husky...');
   try {
     execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
   } catch {
