@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ProjectInfo } from '../detectors/project.js';
 
-import { generateOxlintConfig } from './oxlint.js';
+import { generateOxlintConfig, serializeOxlintConfig } from './oxlint.js';
 import { PRETTIERRC } from './static-configs.js';
 
 interface OxlintConfig {
@@ -82,6 +82,20 @@ describe('generateOxlintConfig for Expo', () => {
 
   it('leaves the other frameworks without overrides', () => {
     expect(JSON.parse(generateOxlintConfig(BASE_INFO))).not.toHaveProperty('overrides');
+  });
+});
+
+describe('serializeOxlintConfig', () => {
+  // update will serialize a config it merged, with no ProjectInfo to hand.
+  it('inlines short arrays without a framework', () => {
+    const json = serializeOxlintConfig({
+      overrides: [{ files: ['**/*.test.ts'], rules: {} }],
+      plugins: ['a', 'b'],
+    });
+
+    expect(json).toContain('"plugins": ["a", "b"]');
+    expect(json).toContain('"files": ["**/*.test.ts"]');
+    expect(json.endsWith('}\n')).toBe(true);
   });
 });
 

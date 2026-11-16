@@ -82,6 +82,10 @@ const EXPO_COMPILER_RULES = [
 ];
 
 export function generateOxlintConfig(info: ProjectInfo): string {
+  return serializeOxlintConfig(buildOxlintConfig(info));
+}
+
+export function buildOxlintConfig(info: ProjectInfo): Record<string, unknown> {
   const hasReact = info.hasReact || info.framework === 'next' || info.framework === 'expo';
   const plugins = ['typescript', 'unicorn', 'import'];
   if (hasReact) plugins.push('react', 'jsx-a11y');
@@ -129,14 +133,22 @@ export function generateOxlintConfig(info: ProjectInfo): string {
     // violation. Warn so a test still surfaces it without failing the commit.
     config['overrides'] = [{ files: EXPO_TEST_GLOB, rules: { 'react/rules-of-hooks': 'warn' } }];
   }
-  // JSON.stringify puts every array item on its own line, but Prettier joins
-  // an array that fits in printWidth onto one. Inline the short arrays (the
-  // plugins list and Expo's test glob) so a fresh `init` passes its own
-  // `prettier --check`.
-  const inlinePlugins = `"plugins": ${JSON.stringify(plugins).replaceAll(',', ', ')}`;
+  return config;
+}
+
+// JSON.stringify puts every array item on its own line, but Prettier joins
+// an array that fits in printWidth onto one. Inline the short arrays (the
+// plugins list and Expo's test glob) so a fresh `init` passes its own
+// `prettier --check`.
+export function serializeOxlintConfig(config: Record<string, unknown>): string {
+  const inlinePlugins = `"plugins": ${JSON.stringify(config['plugins']).replaceAll(',', ', ')}`;
   let json = JSON.stringify(config, null, 2).replace(/"plugins": \[[^\]]*\]/, inlinePlugins);
-  if (info.framework === 'expo') {
-    json = json.replace(/"files": \[[^\]]*\]/, `"files": ${JSON.stringify(EXPO_TEST_GLOB)}`);
+  const overrides = config['overrides'];
+  if (Array.isArray(overrides)) {
+    const first: unknown = overrides[0];
+    const files =
+      typeof first === 'object' && first !== null && 'files' in first ? first.files : undefined;
+    json = json.replace(/"files": \[[^\]]*\]/, `"files": ${JSON.stringify(files)}`);
   }
   return `${json}\n`;
 }
