@@ -13,8 +13,22 @@ vi.mock('../utils/logger.js', () => ({
   warn: vi.fn(),
 }));
 
-const { updatePackageJson } = await import('./package-json.js');
+const { planPackageJson } = await import('./package-json.js');
+const { applyEntries } = await import('./entry.js');
+const { getToolchainDeps } = await import('../utils/versions.js');
 const { warn } = await import('../utils/logger.js');
+
+// planPackageJson writes nothing, so apply its plan the way init does and
+// keep these tests on what lands in package.json.
+function updatePackageJson(targetDir: string, info: ProjectInfo): void {
+  const pkg = JSON.parse(readFileSync(path.join(targetDir, 'package.json'), 'utf8')) as Record<
+    string,
+    unknown
+  >;
+  const { entries, messages } = planPackageJson(pkg, info, getToolchainDeps());
+  applyEntries(targetDir, entries);
+  for (const message of messages) warn(message.text);
+}
 
 const BASE_INFO: ProjectInfo = {
   framework: 'plain',
