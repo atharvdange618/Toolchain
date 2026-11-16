@@ -43,6 +43,22 @@ afterEach(() => {
 });
 
 describe('buildPlan', () => {
+  it.each([{ husky: '^8.0.0' }, {}])(
+    'uses supplied dependencies without registry resolution: %j',
+    (deps) => {
+      const calls = vi.mocked(getToolchainDeps).mock.calls.length;
+      const plan = buildPlan(dir, BASE_INFO, 'pnpm', deps);
+      expect(vi.mocked(getToolchainDeps).mock.calls).toHaveLength(calls);
+      expect(
+        plan.entries.filter((entry) => entry.path.startsWith('package.json#devDependencies.')),
+      ).toEqual(
+        Object.entries(deps).map(([name, version]) => ({
+          path: `package.json#devDependencies.${name}`,
+          want: JSON.stringify(version),
+        })),
+      );
+    },
+  );
   it('plans every file for a bare project and writes none of them', () => {
     const paths = buildPlan(dir, BASE_INFO, 'pnpm').entries.map((entry) => entry.path);
 

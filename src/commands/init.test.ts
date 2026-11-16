@@ -3,13 +3,20 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as detection from '../detectors/project.js';
+import * as entries from '../generators/entry.js';
+import { hashEntry, parseManifest } from '../manifest/manifest.js';
+import * as manifestWriter from '../manifest/write.js';
+
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
-vi.mock('../utils/versions.js', () => ({
+vi.mock('../utils/versions.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/versions.js')>()),
   getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0', typescript: '^7.0.2' })),
 }));
 
 const { execSync } = await import('node:child_process');
 const { init } = await import('./init.js');
+const { getToolchainDeps } = await import('../utils/versions.js');
 
 let dir: string;
 
@@ -24,6 +31,181 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   rmSync(dir, { force: true, recursive: true });
+});
+
+describe('init manifest', () => {
+  function readManifest(): Record<string, string> | undefined {
+    return parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8'));
+  }
+
+  function failOnExit(): void {
+    vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`process.exit(${String(code)})`);
+    });
+  }
+
+  it('records generated tracked wants after applying files and before installation', async () => {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ devDependencies: { eslint: '^9.0.0' }, name: 'demo' }),
+    );
+    vi.mocked(execSync).mockImplementationOnce(() => {
+      const manifest = readManifest();
+      expect(manifest).toBeDefined();
+      for (const file of [
+        '.editorconfig',
+        '.prettierrc',
+        '.prettierignore',
+        'commitlint.config.mjs',
+        '.husky/pre-commit',
+        '.husky/commit-msg',
+      ]) {
+        expect(manifest?.[file]).toBe(hashEntry(file, readFileSync(path.join(dir, file), 'utf8')));
+      }
+      expect(manifest?.['package.json#scripts.lint']).toBe(
+        hashEntry('package.json#scripts.lint', JSON.stringify('oxlint .')),
+      );
+      expect(manifest?.['package.json#devDependencies.typescript']).toBe(
+        hashEntry('package.json#devDependencies.typescript', 'true'),
+      );
+      expect(manifest?.['.oxlintrc.json#rules.typescript/no-explicit-any']).toBeDefined();
+      expect(manifest?.['.oxlintrc.json#plugins.typescript']).toBeDefined();
+      expect(manifest).not.toHaveProperty(['.gitattributes']);
+      expect(manifest).not.toHaveProperty(['tsconfig.json']);
+      expect(manifest).not.toHaveProperty(['package.json#devDependencies.eslint']);
+      return '';
+    });
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(execSync).toHaveBeenCalledWith('pnpm install', expect.anything());
+    const manifest = readManifest();
+    expect(Object.keys(manifest ?? {})).toEqual(Object.keys(manifest ?? {}).sort());
+  });
+
+  it('hashes generator wants rather than rereading modified disk contents', async () => {
+    const apply = entries.applyEntries;
+    vi.spyOn(entries, 'applyEntries').mockImplementation((targetDir, plan) => {
+      apply(targetDir, plan);
+      writeFileSync(path.join(targetDir, '.husky/pre-commit'), 'local change\n');
+    });
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(readManifest()?.['.husky/pre-commit']).toBe(
+      hashEntry('.husky/pre-commit', 'pnpm exec lint-staged\npnpm run typecheck\n'),
+    );
+    expect(readFileSync(path.join(dir, '.husky/pre-commit'), 'utf8')).toBe('local change\n');
+  });
+
+  it('leaves configs and manifest unwritten when dependency lookup fails', async () => {
+    writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    vi.mocked(getToolchainDeps).mockImplementationOnce(() => {
+      throw new Error('Registry unavailable');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    failOnExit();
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Registry unavailable'));
+    expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
+    expect(readFileSync(path.join(dir, 'eslint.config.js'), 'utf8')).toBe('export default [];\n');
+    expect(execSync).not.toHaveBeenCalled();
+  });
+
+  it('retains the applied-content manifest after an install failure', async () => {
+    vi.mocked(execSync).mockImplementationOnce(() => {
+      throw new Error('Install failed');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    failOnExit();
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    expect(readManifest()?.['.editorconfig']).toBe(
+      hashEntry('.editorconfig', readFileSync(path.join(dir, '.editorconfig'), 'utf8')),
+    );
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Run "pnpm install" manually.'));
+    expect(execSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports manifest write failure without installing or announcing readiness', async () => {
+    vi.spyOn(manifestWriter, 'writeManifest').mockImplementation(() => {
+      throw new Error('.toolchain.json: permission denied');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    failOnExit();
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining('.toolchain.json: permission denied'),
+    );
+    expect(execSync).not.toHaveBeenCalled();
+    expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready!'));
+  });
+
+  it('names malformed package.json before detection or writes', async () => {
+    writeFileSync(path.join(dir, 'package.json'), '{');
+    writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    const detect = vi.spyOn(detection, 'detect');
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    failOnExit();
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('package.json'));
+    expect(detect).not.toHaveBeenCalled();
+    expect(readFileSync(path.join(dir, 'package.json'), 'utf8')).toBe('{');
+    expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(true);
+    expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
+    expect(execSync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['root', []],
+    ['scripts', { scripts: [] }],
+    ['dependencies', { dependencies: null }],
+    ['devDependencies', { devDependencies: [] }],
+    ['peerDependencies', { peerDependencies: [] }],
+    ['optionalDependencies', { optionalDependencies: [] }],
+    ['config', { config: [] }],
+    ['scripts.lint', { scripts: { lint: 1 } }],
+  ])('rejects invalid package.json %s before detection or writes', async (field, pkg) => {
+    const original = JSON.stringify(pkg);
+    writeFileSync(path.join(dir, 'package.json'), original);
+    writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    const detect = vi.spyOn(detection, 'detect');
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    failOnExit();
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toThrow(
+      'process.exit(1)',
+    );
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining(`package.json: ${field} must be`));
+    expect(detect).not.toHaveBeenCalled();
+    expect(readFileSync(path.join(dir, 'package.json'), 'utf8')).toBe(original);
+    expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
+    expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(true);
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
+    expect(execSync).not.toHaveBeenCalled();
+  });
 });
 
 describe('init package manager', () => {

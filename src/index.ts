@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { doctor } from './commands/doctor.js';
 import { init } from './commands/init.js';
 import { scaffold } from './commands/scaffold.js';
+import { update } from './commands/update.js';
 import { TEMPLATES } from './generators/templates/index.js';
 import { error } from './utils/logger.js';
 
@@ -29,6 +31,27 @@ program
   .option('--yes', 'Skip prompts and use defaults')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
   .action(init);
+
+program
+  .command('doctor')
+  .description('Check tracked toolchain declarations and hook source files without changing them')
+  .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
+  .addHelpText(
+    'after',
+    '\nChecks root devDependency declarations, not node_modules or registry versions.\nChecks hook source files, not .husky/_ or Git setup.\nCreate-only .gitattributes and tsconfig.json are not checked.\nExits 1 when tracked entries need action; local edits and obsolete entries pass.',
+  )
+  .action((options: { pm?: string }) => {
+    process.exitCode = doctor(options);
+  });
+
+program
+  .command('update')
+  .description('Update toolchain entries while preserving local edits and deletions')
+  .option('--yes', 'Keep conflicts without recording a choice')
+  .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
+  .action(async (options: { yes?: boolean; pm?: string }) => {
+    process.exitCode = await update(options);
+  });
 
 program
   .command('scaffold <project-name>')

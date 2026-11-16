@@ -6,6 +6,9 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Added
 
+- `.toolchain.json` records generated-entry hashes on `init` and `scaffold`, giving later updates a shared base without changing the existing generated files.
+- `doctor` reports tracked config drift without writes or network access and exits 1 when entries need action, for use in CI. It checks root dependency declarations and hook sources, not installed tools or Git hook activation.
+- `update` applies safe changes, preserves local edits and deletions, and asks about conflicts. `--yes` keeps unresolved conflicts without recording a choice. It restores missing required devDependencies and installs only when adding them; failed installs need the printed manual retry.
 - Monorepos get the type-aware rules too. `oxlint-tsgolint` follows a package's tsconfig `references` entry to the other package's source, so nothing has to be built first. Before this, `init` turned type-aware lint off for every monorepo.
 
 ### Changed
@@ -16,7 +19,7 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Notes
 
-- Re-run `init` in a monorepo to pick up the new `.oxlintrc.json`. A monorepo whose packages neither reference each other nor get built before lint will report those imports; a `references` entry fixes it with no build step.
+- Run `doctor`, then interactive `update` to adopt a project without a manifest and review the new `.oxlintrc.json`. A monorepo whose packages neither reference each other nor get built before lint will report those imports; a `references` entry fixes it with no build step.
 
 ## [2.1.2] - 2026-11-13
 

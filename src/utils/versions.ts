@@ -6,22 +6,29 @@ export function getExpressVersion(): string {
   return toRange('express');
 }
 
-export function getToolchainDeps(): Record<string, string> {
-  return {
-    ...getVersions([
-      '@commitlint/cli',
-      '@commitlint/config-conventional',
-      '@commitlint/cz-commitlint',
-      'commitizen',
-      'husky',
-      'lint-staged',
-      'oxlint',
-      'oxlint-tsgolint',
-      'prettier',
-    ]),
-    // The generated typecheck script and oxlint's type-aware rules both need it.
-    typescript: getTypescriptVersion(),
-  };
+export const TOOLCHAIN_DEP_NAMES: readonly string[] = [
+  '@commitlint/cli',
+  '@commitlint/config-conventional',
+  '@commitlint/cz-commitlint',
+  'commitizen',
+  'husky',
+  'lint-staged',
+  'oxlint',
+  'oxlint-tsgolint',
+  'prettier',
+  'typescript',
+];
+
+export function getToolchainDeps(
+  names: readonly string[] = TOOLCHAIN_DEP_NAMES,
+): Record<string, string> {
+  for (const name of names) {
+    if (!TOOLCHAIN_DEP_NAMES.includes(name))
+      throw new Error(`Unknown toolchain dependency: ${name}`);
+  }
+  return Object.fromEntries(
+    names.map((name) => [name, name === 'typescript' ? getTypescriptVersion() : toRange(name)]),
+  );
 }
 
 export function getTurboVersion(): string {

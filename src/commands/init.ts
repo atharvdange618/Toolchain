@@ -8,12 +8,16 @@ import {
   type PackageManager,
   pmExec,
   type UnsupportedStack,
+  unsupportedMessage,
   VALID_PACKAGE_MANAGERS,
   workspacePackageDirs,
 } from '../detectors/project.js';
 import { applyEntries, type Plan } from '../generators/entry.js';
 import { ESLINT_DEP } from '../generators/package-json.js';
 import { buildPlan } from '../generators/plan.js';
+import { hashEntry, type Manifest } from '../manifest/manifest.js';
+import { trackedEntries, validatePackageJson } from '../manifest/project.js';
+import { writeManifest } from '../manifest/write.js';
 import { readJson } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 
@@ -73,6 +77,20 @@ export async function init(options: {
 
   const targetDir = options.targetDir ?? process.cwd();
 
+  try {
+    const packageJson = path.join(targetDir, 'package.json');
+    if (!existsSync(packageJson)) {
+      throw new Error(
+        'No package.json found in current directory. Run this command from the root of your project.',
+      );
+    }
+    validatePackageJson(readJson(packageJson));
+  } catch (error_) {
+    const message = error_ instanceof Error ? error_.message : 'Could not read or validate file.';
+    error(message.startsWith('package.json:') ? message : `package.json: ${message}`);
+    return process.exit(1);
+  }
+
   step(1, 'Detecting project environment...');
   const projectInfo = detect(targetDir);
   // Resolved once so the hooks and the install can't disagree.
@@ -95,11 +113,7 @@ export async function init(options: {
   // The config keeps type-aware rules on either way: writing a weaker config
   // would hide the problem, and the same imports fail typecheck on that tree.
   // So init names the imports and the two ways to resolve them.
-  if (projectInfo.unresolvedWorkspaceTypes.length > 0) {
-    warn(
-      `Type-aware lint needs each workspace import to resolve, and these don't: ${projectInfo.unresolvedWorkspaceTypes.join(', ')}. Every use of them reports under the no-unsafe-* rules until they do. Add the dependency to the importing package's tsconfig "references" (needs no build), or build the packages before lint runs (a fresh clone or CI needs that build too).`,
-    );
-  }
+  warnAboutWorkspaceTypes(projectInfo.unresolvedWorkspaceTypes);
 
   if (!options.yes) {
     const response = await prompts({
@@ -134,6 +148,17 @@ export async function init(options: {
   moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
   moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
   applyEntries(targetDir, plan.entries);
+  try {
+    const manifest: Manifest = {};
+    for (const entry of trackedEntries(plan)) {
+      const hash = hashEntry(entry.path, entry.want ?? undefined);
+      if (hash !== undefined) manifest[entry.path] = hash;
+    }
+    writeManifest(targetDir, manifest);
+  } catch (error_) {
+    error(error_ instanceof Error ? error_.message : 'Failed to record .toolchain.json.');
+    return process.exit(1);
+  }
   for (const entry of plan.entries) {
     if (!entry.path.startsWith('package.json#')) success(entry.path);
   }
@@ -174,14 +199,7 @@ export async function init(options: {
 // passing. Refusing is the honest answer until those checkers run on TS 7.
 // One error() call so the message stays on stderr, in one piece.
 function refuseUnsupported(stack: UnsupportedStack): never {
-  error(
-    [
-      `Unsupported project: ${stack.name} (found "${stack.package}" in package.json).`,
-      `  ${stack.name} checks its components with ${stack.checker}, which needs TypeScript's compiler API,`,
-      '  and TypeScript 7 no longer ships one, so "tsc --noEmit" would check none of them.',
-      '  Keep this project on TypeScript 6: npm i -D typescript@npm:@typescript/typescript6',
-    ].join('\n'),
-  );
+  error(unsupportedMessage(stack));
   return process.exit(1);
 }
 
@@ -197,7 +215,17 @@ function moveAside(targetDir: string, names: string[], ours: string): void {
 
 // init only touches the root, so per-package ESLint setups and TypeScript
 // pins stay. Listing them beats rewriting every package's scripts and deps.
-function warnAboutWorkspacePackages(targetDir: string): void {
+export function warnAboutWorkspaceTypes(imports: readonly string[]): void {
+  if (imports.length === 0) return;
+  warn(
+    `Type-aware lint needs each workspace import to resolve, and these don't: ${imports.join(', ')}. Every use of them reports under the no-unsafe-* rules until they do. Add the dependency to the importing package's tsconfig "references" (needs no build), or build the packages before lint runs (a fresh clone or CI needs that build too).`,
+  );
+}
+
+export function warnAboutWorkspacePackages(
+  targetDir: string,
+  command: 'init' | 'update' = 'init',
+): void {
   const eslint: string[] = [];
   const oldTypescript: string[] = [];
   for (const rel of workspacePackageDirs(targetDir)) {
@@ -227,18 +255,20 @@ function warnAboutWorkspacePackages(targetDir: string): void {
     'lint' in ((readJson(turboPath)['tasks'] as Record<string, unknown> | undefined) ?? {});
 
   if (eslint.length > 0 || turboLint) {
+    const packages = [...eslint, ...(turboLint ? ['turbo.json lint task'] : [])].join(', ');
     warn(
-      `ESLint is still set up in workspace packages, which init leaves alone: ${[
-        ...eslint,
-        ...(turboLint ? ['turbo.json lint task'] : []),
-      ].join(
-        ', ',
-      )}. The root "oxlint ." lints them now, so their eslint configs, ESLint deps and lint scripts can go.`,
+      command === 'init'
+        ? `ESLint is still set up in workspace packages, which init leaves alone: ${packages}. The root "oxlint ." lints them now, so their eslint configs, ESLint deps and lint scripts can go.`
+        : `ESLint is still set up in workspace packages, which update leaves alone: ${packages}. Review their ESLint configs, dependencies and lint scripts when moving them to oxlint.`,
     );
   }
   if (oldTypescript.length > 0) {
+    const rootTs = (
+      readJson(path.join(targetDir, 'package.json'))['devDependencies'] as
+        Record<string, string> | undefined
+    )?.['typescript'];
     warn(
-      `The root now uses TypeScript 7, but these packages pin their own older typescript: ${oldTypescript.join(', ')}. Their own check scripts keep using it. When you move them to 7, drop baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system" from their tsconfigs.`,
+      `${command === 'init' ? 'The root now uses TypeScript 7, but these packages pin their own older typescript' : `The root TypeScript declaration is ${rootTs ?? 'absent'}; these packages pin TypeScript below 7`}: ${oldTypescript.join(', ')}. Their own check scripts keep using it. When you move them to 7, drop baseUrl, moduleResolution "node"/"node10", target "es5", outFile, and module "amd"/"umd"/"system" from their tsconfigs.`,
     );
   }
 }

@@ -141,14 +141,12 @@ function buildOxlintConfig(info: ProjectInfo): Record<string, unknown> {
 // plugins list and Expo's test glob) so a fresh `init` passes its own
 // `prettier --check`.
 export function serializeOxlintConfig(config: Record<string, unknown>): string {
-  const inlinePlugins = `"plugins": ${JSON.stringify(config['plugins']).replaceAll(',', ', ')}`;
-  let json = JSON.stringify(config, null, 2).replace(/"plugins": \[[^\]]*\]/, inlinePlugins);
-  const overrides = config['overrides'];
-  if (Array.isArray(overrides)) {
-    const first: unknown = overrides[0];
-    const files =
-      typeof first === 'object' && first !== null && 'files' in first ? first.files : undefined;
-    json = json.replace(/"files": \[[^\]]*\]/, `"files": ${JSON.stringify(files)}`);
-  }
+  const json = JSON.stringify(config, null, 2).replace(
+    /"(plugins|files)": \[((?:\s*"(?:\\.|[^"\\])*"\s*,?)*\s*)\]/g,
+    (_match, key: string, items: string) => {
+      const values = JSON.parse(`[${items}]`) as string[];
+      return `"${key}": [${values.map((item) => JSON.stringify(item)).join(', ')}]`;
+    },
+  );
   return `${json}\n`;
 }

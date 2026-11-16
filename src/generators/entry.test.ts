@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { applyEntries, effectiveScripts } from './entry.js';
+import { applyEntries, applyKeyEntries, effectiveScripts } from './entry.js';
 
 let dir: string;
 
@@ -121,5 +121,62 @@ describe('effectiveScripts', () => {
 
   it('drops non-string script values on disk', () => {
     expect(effectiveScripts([], { lint: 'oxlint .', odd: 42 })).toEqual({ lint: 'oxlint .' });
+  });
+});
+
+describe('applyKeyEntries', () => {
+  it('creates missing membership arrays and preserves existing item order', () => {
+    const config = { rules: { custom: ['warn', { option: true }] } };
+    applyKeyEntries(config, '.oxlintrc.json#', [
+      { path: '.oxlintrc.json#plugins.import', want: '"import"' },
+      { path: '.oxlintrc.json#plugins.import', want: '"import"' },
+      { path: '.oxlintrc.json#ignorePatterns.**/*.config.*', want: '"**/*.config.*"' },
+    ]);
+    expect(config).toEqual({
+      rules: { custom: ['warn', { option: true }] },
+      plugins: ['import'],
+      ignorePatterns: ['**/*.config.*'],
+    });
+  });
+
+  it('removes every selected copy without changing other items', () => {
+    const config = { plugins: ['react', 'import', 'unicorn', 'import'] };
+    applyKeyEntries(config, '.oxlintrc.json#', [
+      { path: '.oxlintrc.json#plugins.import', want: null },
+    ]);
+    expect(config.plugins).toEqual(['react', 'unicorn']);
+  });
+
+  it('does not create missing containers for removals', () => {
+    const pkg = { name: 'demo' };
+    applyKeyEntries(pkg, 'package.json#', [
+      { path: 'package.json#devDependencies.eslint', want: null },
+    ]);
+    expect(pkg).toEqual({ name: 'demo' });
+  });
+
+  it.each([
+    { path: 'package.json#config.commitizen', want: '{}' },
+    { path: 'package.json#scripts.__proto__', want: '"unsafe"' },
+    { path: 'package.json#constructor.prototype', want: '"unsafe"' },
+  ])('validates all selected properties before mutation: $path', (bad) => {
+    const pkg = { config: [] };
+    expect(() =>
+      applyKeyEntries(pkg, 'package.json#', [
+        { path: 'package.json#scripts.lint', want: '"oxlint ."' },
+        bad,
+      ]),
+    ).toThrow();
+    expect(pkg).toEqual({ config: [] });
+  });
+
+  it('rejects malformed membership arrays rather than discarding them', () => {
+    const config = { plugins: { custom: true } };
+    expect(() =>
+      applyKeyEntries(config, '.oxlintrc.json#', [
+        { path: '.oxlintrc.json#plugins.import', want: '"import"' },
+      ]),
+    ).toThrow('plugins');
+    expect(config).toEqual({ plugins: { custom: true } });
   });
 });

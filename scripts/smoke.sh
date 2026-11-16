@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Packs the CLI, scaffolds real projects from the tarball, and checks that
-# each one passes its own lint, typecheck, format, build, and commit hooks.
+# each one passes its own lint, typecheck, format, build, doctor and commit hooks.
 # Catches what unit tests can't: a plugin's new major breaking the
 # generated config, or a package manager changing its install rules.
 #
@@ -41,6 +41,8 @@ run_case() {
       if "$pm" run "$script" > "../logs/$script.log" 2>&1; then result="$result $script:ok"
       else result="$result $script:FAIL"; failed=1; fi
     done
+    if node "$CLI" doctor --pm "$pm" > ../logs/doctor.log 2>&1; then result="$result doctor:ok"
+    else result="$result doctor:FAIL"; failed=1; fi
     # Good message first: if it passes, pre-commit works, so a rejected bad
     # message can only be commitlint's doing. The grep confirms that.
     if git commit -q --allow-empty -m "chore: smoke test" > ../logs/commit-good.log 2>&1; then
