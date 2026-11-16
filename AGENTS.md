@@ -24,6 +24,8 @@ src/
 ├── detectors/
 │   └── project.ts              # Framework, package manager, monorepo, tsconfig, unsupported stacks, TS file scan
 ├── generators/
+│   ├── entry.ts                # Entry/Plan types, applyEntries (the one writer), effectiveScripts
+│   ├── plan.ts                 # buildPlan: every entry init would write, written nowhere
 │   ├── oxlint.ts               # .oxlintrc.json per framework
 │   ├── husky.ts                # .husky/pre-commit and .husky/commit-msg
 │   ├── package-json.ts         # Scripts, lint-staged, devDependencies
@@ -46,7 +48,7 @@ Registers `init` (`--yes`, `--pm`) and `scaffold <project-name>` (`--template`, 
 
 ### `src/commands/init.ts`
 
-Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, static configs, oxlint config, tsconfig, package.json, Husky hooks, install, `husky`.
+Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, install, `husky`. No generator writes to disk; `buildPlan` resolves dependency versions before anything is written, so a failed lookup leaves the project untouched.
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.
@@ -54,7 +56,7 @@ Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prom
 - Moves other configs aside (renames to `.bak`) instead of deleting them, so the user keeps custom rules: every ESLint config, an existing `.oxlintrc.json`, and every commitlint config other than `commitlint.config.mjs`.
 - Writes `.gitattributes` only when none exists, since an existing one may carry LFS filters.
 - Keeps an existing `tsconfig.json`. A monorepo with no root tsconfig gets none, because an empty root config makes tsc check every package with the wrong options.
-- Writes the hooks after `package.json`, so the hooks see the final scripts.
+- The hooks follow the planned scripts (`effectiveScripts`: disk scripts with the planned ones applied), not the disk.
 - In a monorepo, warns about workspace packages still on ESLint or on TypeScript below 7. It warns rather than rewrites, since package scripts and deps belong to the user.
 - Ends by naming the supported stacks, so the boundary is visible without the README.
 
@@ -74,8 +76,18 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - `workspacePackageDirs()` handles exact paths and one-level `dir/*` patterns only.
 - `unresolvedWorkspaceTypes()` lists `package -> dependency` for every workspace import that resolves to neither a tsconfig `references` entry in the importing package nor the dependency's built `.d.ts`. It reads tsconfig references by regex, compares resolved paths case-insensitively on Windows, and skips a package with no tsconfig of its own, since the root config then decides.
 
+### `src/generators/entry.ts`
+
+- `Entry` is `{ path, want }`. A plain path is a whole file and `want` its content. `package.json#<top>` or `package.json#<top>.<key>` is one JSON key: `want` is its `JSON.stringify`'d value and `null` deletes it. The key splits at the first dot after `#`, so dependency names with dots work.
+- `applyEntries` writes file entries, then reads `package.json` once, applies key entries in order and writes it back. An existing key keeps its position; a new one appends. A file entry with `want: null` throws, since nothing plans a file removal yet.
+
+### `src/generators/plan.ts`
+
+`buildPlan(targetDir, info, pm)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once and writes nothing.
+
 ### `src/generators/oxlint.ts`
 
+- `generateOxlintConfig` is `serializeOxlintConfig(buildOxlintConfig(info))`. `serializeOxlintConfig` needs no `ProjectInfo`, so a merged config can be serialized too.
 - Plugins: `typescript`, `unicorn`, `import`; React adds `react` and `jsx-a11y`; Next.js adds `nextjs`.
 - `correctness` category on as `error`, plus the typescript-eslint recommended and type-checked rules oxlint doesn't turn on by default, so v2 enforces what v1 did.
 - `import/no-cycle` and `import/no-duplicates` warn, `import/no-self-import` errors.
@@ -86,11 +98,13 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/husky.ts`
 
+- `generateHuskyHooks(scripts, pm)` returns `{ preCommit, commitMsg }` from the scripts it's given; it reads no file.
 - `pre-commit`: `next typegen` when the final `lint` script starts with it (Next.js 15.5+, since lint-staged calls oxlint directly), then `lint-staged`, then `typecheck` if the script exists, then `test` if the script exists and isn't npm's "no test specified" placeholder.
 - `commit-msg`: `commitlint --edit "$1"`, quoted so paths with spaces work.
 
 ### `src/generators/package-json.ts`
 
+- `planPackageJson(pkg, info, toolchainDeps)` returns key entries (scripts, `lint-staged`, `config.commitizen`, removed and added devDependencies) and its warnings as messages. It reads and writes nothing.
 - Scripts: `commit`, `format`, `format:check`, `lint`, `lint:fix`, `lint:strict`, `prepare`, `typecheck` (`tsc -b` when the root tsconfig has project references; Next.js 15.5 and later prefix `next typegen &&` to `typecheck`, `lint`, `lint:fix` and `lint:strict`, so tsc and type-aware oxlint see the generated route types). A monorepo with no root tsconfig keeps its own `typecheck`.
 - lint-staged: `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the hook. The code glob is `*.{js,jsx,cjs,mjs,ts,tsx}` for Expo and `*.{ts,tsx}` otherwise; `*.{json,md,css}` runs Prettier.
 - Removes ESLint devDependencies (`ESLINT_DEP` regex) and warns when TypeScript moves up to 7.
@@ -132,7 +146,7 @@ pnpm test             # Vitest
 pnpm run smoke        # Scaffold every template from the packed CLI and check it (slow, needs network)
 ```
 
-This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.husky/commit-msg` are what `generateOxlintConfig` and `writeHuskyHooks` produce for this repo (a plain pnpm project), byte for byte, so they double as a check on the generators. Don't hand-edit them: when you change `oxlint.ts` or `husky.ts`, update these files to the new output in the same commit. The pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
+This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.husky/commit-msg` are what `generateOxlintConfig` and `generateHuskyHooks` produce for this repo (a plain pnpm project), byte for byte, so they double as a check on the generators. Don't hand-edit them: when you change `oxlint.ts` or `husky.ts`, update these files to the new output in the same commit. The pre-commit hook runs lint-staged, typecheck and tests. Running `pnpm run format` reflows unrelated files; revert those before committing.
 
 CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
