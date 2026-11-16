@@ -1,27 +1,16 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { writeHuskyHooks } from './husky.js';
+import { generateHuskyHooks } from './husky.js';
 
-let dir: string;
-
-function preCommitFor(pkg: Record<string, unknown>): string {
-  writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkg));
-  writeHuskyHooks(dir, 'pnpm');
-  return readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8');
+function hooksFor(pkg: Record<string, unknown>): { commitMsg: string; preCommit: string } {
+  return generateHuskyHooks(pkg['scripts'] as Record<string, string> | undefined, 'pnpm');
 }
 
-beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'toolchain-husky-'));
-});
+function preCommitFor(pkg: Record<string, unknown>): string {
+  return hooksFor(pkg).preCommit;
+}
 
-afterEach(() => {
-  rmSync(dir, { force: true, recursive: true });
-});
-
-describe('writeHuskyHooks pre-commit', () => {
+describe('generateHuskyHooks pre-commit', () => {
   it('runs tests when the target has a test script', () => {
     expect(preCommitFor({ scripts: { test: 'vitest', typecheck: 'tsc --noEmit' } })).toBe(
       'pnpm exec lint-staged\npnpm run typecheck\npnpm run test\n',
@@ -64,12 +53,8 @@ describe('writeHuskyHooks pre-commit', () => {
   });
 });
 
-describe('writeHuskyHooks commit-msg', () => {
+describe('generateHuskyHooks commit-msg', () => {
   it('quotes the message file path so a path with spaces stays one argument', () => {
-    preCommitFor({ name: 'demo' });
-
-    expect(readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8')).toBe(
-      'pnpm exec commitlint --edit "$1"\n',
-    );
+    expect(hooksFor({ name: 'demo' }).commitMsg).toBe('pnpm exec commitlint --edit "$1"\n');
   });
 });
