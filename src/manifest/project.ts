@@ -15,7 +15,7 @@ import type { Entry, Plan } from '../generators/entry.js';
 import { buildPlan } from '../generators/plan.js';
 import { hasCode, isObject } from '../utils/fs.js';
 import { TOOLCHAIN_DEP_NAMES } from '../utils/versions.js';
-import { classify, type Comparison } from './classify.js';
+import { classify, type Comparison, isStricterRule } from './classify.js';
 import {
   assertEntryPath,
   hashEntry,
@@ -278,7 +278,12 @@ export function compareProject(project: Project, entries: Entry[]): Comparison[]
       const base = project.manifest?.[entryPath];
       const disk = diskValue(project, entryPath);
       const want = wanted.get(entryPath) ?? undefined;
-      const state = classify(base, hashEntry(entryPath, disk), hashEntry(entryPath, want));
+      const state = classify(
+        base,
+        hashEntry(entryPath, disk),
+        hashEntry(entryPath, want),
+        isStricterRule(entryPath, disk, want),
+      );
       return { path: entryPath, state, base, disk, want };
     });
 }

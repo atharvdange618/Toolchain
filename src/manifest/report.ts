@@ -1,4 +1,4 @@
-import { type Comparison, needsAction, type State } from './classify.js';
+import { type Comparison, isStricterRule, needsAction, type State } from './classify.js';
 import { isHookPath } from './manifest.js';
 
 const STATES: State[] = [
@@ -27,6 +27,11 @@ export function reportComparisons(
     console.log(`${state}:`);
     for (const row of group) {
       console.log(`  ${row.path}${row.disk === undefined ? ' (absent)' : ''}`);
+      if (state === 'local-edit' && isStricterRule(row.path, row.disk, row.want)) {
+        console.log(
+          `    stricter than generated (${row.disk} vs ${row.want}); keeping it is safe.`,
+        );
+      }
       if (state === 'stale' || state === 'conflict' || state === 'unknown-origin') {
         for (const [prefix, value] of [
           ['-', row.disk],

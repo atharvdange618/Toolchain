@@ -86,4 +86,21 @@ describe('reportComparisons', () => {
     });
     expect(output()).toContain('remove its manifest entry and run update');
   });
+
+  it('says a stricter local rule is safe to keep', () => {
+    reportComparisons([
+      {
+        path: '.oxlintrc.json#rules.import/no-cycle',
+        state: 'local-edit',
+        base: undefined,
+        disk: '"error"',
+        want: '"warn"',
+      },
+      { ...row('local-edit', '.prettierrc'), disk: 'a', want: 'b' },
+    ]);
+    const text = output();
+    expect(text).toContain('    stricter than generated ("error" vs "warn"); keeping it is safe.');
+    expect(text.match(/keeping it is safe/g)).toHaveLength(1);
+    expect(text).toContain('0 need action');
+  });
 });

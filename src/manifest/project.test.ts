@@ -70,6 +70,17 @@ describe('offline project snapshot', () => {
       expect(parse.mock.calls.filter(([input]) => input === text)).toHaveLength(1);
   });
 
+  it('classifies a local rule stricter than the generated one as a local edit', () => {
+    write('.oxlintrc.json', {
+      rules: { 'import/no-cycle': 'error', 'import/no-duplicates': 'off' },
+    });
+    const rows = compareProject(loadProject(dir), [
+      { path: '.oxlintrc.json#rules.import/no-cycle', want: '"warn"' },
+      { path: '.oxlintrc.json#rules.import/no-duplicates', want: '"warn"' },
+    ]);
+    expect(rows.map((row) => row.state)).toEqual(['local-edit', 'unknown-origin']);
+  });
+
   it('keeps literal null distinct from an absent JSON value', () => {
     const entryPath = '.oxlintrc.json#options';
     write('.oxlintrc.json', { options: null });

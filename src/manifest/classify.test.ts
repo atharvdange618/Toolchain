@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Comparison, State } from './classify.js';
-import { classify, needsAction } from './classify.js';
+import { classify, isStricterRule, needsAction } from './classify.js';
 
 describe('classify', () => {
   it.each<[string | undefined, string | undefined, string | undefined, State]>([
@@ -20,8 +20,37 @@ describe('classify', () => {
     expect(classify(base, disk, want)).toBe(expected);
   });
 
+  it('turns unknown-origin and conflict into local-edit when the local rule is stricter', () => {
+    expect(classify(undefined, 'd', 'w', true)).toBe('local-edit');
+    expect(classify('b', 'd', 'w', true)).toBe('local-edit');
+  });
+
+  it('still updates a stale rule the user never edited, even if it is stricter', () => {
+    expect(classify('b', 'b', 'w', true)).toBe('stale');
+  });
+
   it('rejects a path outside the generated and manifest union', () => {
     expect(() => classify(undefined, undefined, undefined)).toThrow();
+  });
+});
+
+describe('isStricterRule', () => {
+  const rule = '.oxlintrc.json#rules.import/no-cycle';
+  it.each<[string, string | undefined, string | undefined, boolean]>([
+    [rule, '"error"', '"warn"', true],
+    [rule, '"deny"', '"warn"', true],
+    [rule, '2', '"warn"', true],
+    [rule, '"warn"', '"off"', true],
+    [rule, '"warn"', '"error"', false],
+    [rule, '"warn"', '"warn"', false],
+    [rule, '"off"', '"warn"', false],
+    [rule, '["error",{"max":1}]', '"warn"', false],
+    [rule, undefined, '"warn"', false],
+    [rule, '"error"', undefined, false],
+    ['.oxlintrc.json#overrides', '"error"', '"warn"', false],
+    ['package.json#scripts.lint', '"error"', '"warn"', false],
+  ])('%s disk=%s want=%s is %s', (entryPath, disk, want, expected) => {
+    expect(isStricterRule(entryPath, disk, want)).toBe(expected);
   });
 });
 
