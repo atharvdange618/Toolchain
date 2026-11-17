@@ -155,6 +155,20 @@ describe('applyKeyEntries', () => {
     expect(pkg).toEqual({ name: 'demo' });
   });
 
+  it('drops config when removing its last key, and keeps other config keys', () => {
+    const only = { config: { commitizen: { path: 'x' } }, name: 'demo' };
+    applyKeyEntries(only, 'package.json#', [
+      { path: 'package.json#config.commitizen', want: null },
+    ]);
+    expect(only).toEqual({ name: 'demo' });
+
+    const shared = { config: { commitizen: { path: 'x' }, other: true } };
+    applyKeyEntries(shared, 'package.json#', [
+      { path: 'package.json#config.commitizen', want: null },
+    ]);
+    expect(shared).toEqual({ config: { other: true } });
+  });
+
   it.each([
     { path: 'package.json#config.commitizen', want: '{}' },
     { path: 'package.json#scripts.__proto__', want: '"unsafe"' },

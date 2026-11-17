@@ -2,6 +2,12 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+
+- The interactive commit prompt: the `commit` script, `config.commitizen`, and the `commitizen` and `@commitlint/cz-commitlint` devDependencies. Every `commitizen` release pins `glob@7.2.3`, so each npm install printed deprecation warnings for `glob` and `inflight` (#10). The `commit-msg` hook still enforces the format. `update` removes the script and config when unedited; see [Upgrading](docs/upgrading.md#from-22) to remove the packages.
+
 ## [2.2.0] - 2026-11-17
 
 ### Added

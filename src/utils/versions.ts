@@ -9,8 +9,6 @@ export function getExpressVersion(): string {
 export const TOOLCHAIN_DEP_NAMES: readonly string[] = [
   '@commitlint/cli',
   '@commitlint/config-conventional',
-  '@commitlint/cz-commitlint',
-  'commitizen',
   'husky',
   'lint-staged',
   'oxlint',
