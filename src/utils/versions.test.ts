@@ -252,17 +252,12 @@ describe('getToolchainDeps', () => {
     const deps = await getToolchainDeps();
 
     expect(Object.keys(deps)).toEqual(
-      expect.arrayContaining([
-        'prettier',
-        'husky',
-        'lint-staged',
-        'oxlint',
-        'oxlint-tsgolint',
-        'commitizen',
-        '@commitlint/cz-commitlint',
-      ]),
+      expect.arrayContaining(['prettier', 'husky', 'lint-staged', 'oxlint', 'oxlint-tsgolint']),
     );
     expect(deps).not.toHaveProperty('eslint');
+    // commitizen pins glob@7.2.3, which pulls in the deprecated inflight (#10).
+    expect(deps).not.toHaveProperty('commitizen');
+    expect(deps).not.toHaveProperty('@commitlint/cz-commitlint');
     expect(deps).not.toHaveProperty('eslint-import-resolver-typescript');
     const { typescript, ...rest } = deps;
     for (const version of Object.values(rest)) {

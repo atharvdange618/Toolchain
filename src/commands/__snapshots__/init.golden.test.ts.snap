@@ -185,12 +185,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "1c373130398f1f10e7f1f147658e6144b4db107aac34ef8d8169bcd8a4494ea3",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "bb9991cb7b909de3b75bca9a27655aade19304466215f443bbd5ceed9a5b7bda",
@@ -212,7 +210,6 @@ coverage
   },
   "name": "demo",
   "scripts": {
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "oxlint .",
@@ -230,11 +227,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -412,12 +404,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "bb9991cb7b909de3b75bca9a27655aade19304466215f443bbd5ceed9a5b7bda",
@@ -438,7 +428,6 @@ coverage
   },
   "name": "demo",
   "scripts": {
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "oxlint .",
@@ -456,11 +445,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -640,12 +624,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "bb9991cb7b909de3b75bca9a27655aade19304466215f443bbd5ceed9a5b7bda",
@@ -663,7 +645,6 @@ coverage
   "name": "monorepo",
   "scripts": {
     "typecheck": "turbo run check",
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "oxlint .",
@@ -683,11 +664,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -852,12 +828,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "f95afbfdc0f5182c31cae096afdf0895b745f69cddb5a21f7e413f8e22f7cf47",
@@ -879,7 +853,6 @@ coverage
   },
   "name": "demo",
   "scripts": {
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "next typegen && oxlint .",
@@ -897,11 +870,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -1079,12 +1047,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "bb9991cb7b909de3b75bca9a27655aade19304466215f443bbd5ceed9a5b7bda",
@@ -1102,7 +1068,6 @@ coverage
   "package.json": "{
   "name": "demo",
   "scripts": {
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "oxlint .",
@@ -1120,11 +1085,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -1305,12 +1265,10 @@ coverage
     ".prettierignore": "af4c047e39e0ed55aaef888891ce97b971e291e3b2418606a1e2a8fdb793750b",
     ".prettierrc": "5706661aaafac9e6d81af97a7c3c3742c34c263a07c4b902af9578e7bfad8ad9",
     "commitlint.config.mjs": "b0acbdafc17f8ffc98a1858f0be9b9453f4e359800b7ca7b0a11e7dc0cf2bcee",
-    "package.json#config.commitizen": "7d168c8fd081301670741bdcaa006c0732f34a1d4d7421ca6b16904ea7e3a53e",
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
-    "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
     "package.json#scripts.lint": "bb9991cb7b909de3b75bca9a27655aade19304466215f443bbd5ceed9a5b7bda",
@@ -1337,7 +1295,6 @@ coverage
   "scripts": {
     "lint": "oxlint .",
     "test": "vitest run",
-    "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:fix": "oxlint . --fix",
@@ -1354,11 +1311,6 @@ coverage
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   }
 }
 ",
