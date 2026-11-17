@@ -218,7 +218,7 @@ Each package has its own `package.json`, `tsconfig.json`, and source files with 
 
 On Next.js 15.5 and later, `lint`, `lint:fix` and `lint:strict` run `next typegen` first, like `typecheck`. Type-aware oxlint reads `RouteContext` from the files it writes, and on a fresh checkout every `context.params` would otherwise fail as an error-typed value. The pre-commit hook runs `next typegen` before `lint-staged` for the same reason.
 
-`lint-staged` runs `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the commit with the linter's message. Expo projects match `*.{js,jsx,cjs,mjs,ts,tsx}`; every other project matches `*.{ts,tsx}`.
+`lint-staged` runs `oxlint --fix`, then a plain `oxlint`, then Prettier, so a fix that leaves an error fails the commit with the linter's message. Expo projects match `*.{js,jsx,cjs,mjs,ts,tsx}`; every other project matches `*.{ts,tsx}`. Both oxlint steps pass `--no-error-on-unmatched-pattern`, so a commit that stages only files `.oxlintrc.json` ignores, such as `vite.config.ts` or `components/ui`, still passes.
 
 ## TypeScript configuration
 

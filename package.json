@@ -78,8 +78,8 @@
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },

@@ -189,7 +189,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "139874d6d616cb18a6914d4119d1f821da03c6897f95080f0ecf9f9c9e241ef5",
+    "package.json#lint-staged": "1c373130398f1f10e7f1f147658e6144b4db107aac34ef8d8169bcd8a4494ea3",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -226,8 +226,8 @@ coverage
       "prettier --write"
     ],
     "*.{js,jsx,cjs,mjs,ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
@@ -416,7 +416,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -452,8 +452,8 @@ coverage
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
@@ -644,7 +644,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -679,8 +679,8 @@ coverage
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
@@ -856,7 +856,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -893,8 +893,8 @@ coverage
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
@@ -1083,7 +1083,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -1116,8 +1116,8 @@ coverage
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
@@ -1309,7 +1309,7 @@ coverage
     "package.json#devDependencies.husky": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.oxlint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",
@@ -1350,8 +1350,8 @@ coverage
       "prettier --write"
     ],
     "*.{ts,tsx}": [
-      "oxlint --fix",
-      "oxlint",
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
   },
