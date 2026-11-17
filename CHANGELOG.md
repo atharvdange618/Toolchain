@@ -2,7 +2,7 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [2.2.0] - 2026-11-17
 
 ### Added
 
