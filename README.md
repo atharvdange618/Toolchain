@@ -2,9 +2,25 @@
 
 A CLI that sets up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in Next.js, React, Expo, Express and plain TS projects with one command.
 
+Run it with your project's package manager:
+
+```bash
+npx @atharvdange/toolchain init
+```
+
 ```bash
 pnpm dlx @atharvdange/toolchain init
 ```
+
+```bash
+yarn dlx @atharvdange/toolchain init
+```
+
+```bash
+bunx @atharvdange/toolchain init
+```
+
+The examples below use `pnpm dlx`; swap in `npx`, `yarn dlx` (Yarn 2+) or `bunx` for your manager. `--pm` picks the manager for installs and hooks, whichever runner started the CLI.
 
 Release notes live in [CHANGELOG.md](CHANGELOG.md).
 
