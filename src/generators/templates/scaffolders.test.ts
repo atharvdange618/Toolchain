@@ -11,11 +11,7 @@ vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
 
 const targetDir = path.resolve('parent', 'demo');
 
-function run(
-  generate: typeof generateReact,
-  packageManager: PackageManager,
-  yes: boolean,
-): string {
+function run(generate: typeof generateReact, packageManager: PackageManager, yes: boolean): string {
   const ctx = { packageManager, projectName: 'demo', targetDir, yes };
   generate(ctx).scaffold?.(ctx);
   const [command, options] = vi.mocked(execSync).mock.calls[0] ?? [];

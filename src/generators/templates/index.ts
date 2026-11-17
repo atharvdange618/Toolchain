@@ -28,7 +28,7 @@ export interface TemplateContext {
 }
 
 export interface TemplateResult {
-  files: Array<{ content: string; path: string; }>;
+  files: Array<{ content: string; path: string }>;
   framework: 'express' | 'next' | 'plain' | 'react';
   hasReact: boolean;
   isMonorepo: boolean;
