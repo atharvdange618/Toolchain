@@ -166,7 +166,7 @@ git commit -m "feat(update): choose conflicts with --keep and --overwrite"
 - Consumes: `updateCommand`, `needsAction`.
 - Produces: `nextCommand(rows: Comparison[], pm: PackageManager, hasManifest: boolean): string | undefined`.
 
-- [ ] **Step 1: Write the failing tests** in `report.test.ts` for `nextCommand`:
+- [x] **Step 1: Write the failing tests** in `report.test.ts` for `nextCommand`:
   - Unknown-origin `.prettierrc` plus conflict `.editorconfig` gives `updateCommand('npm', ['.editorconfig', '.prettierrc'])`.
   - Only a `stale` or `missing` row gives `updateCommand('npm', [])`.
   - A mixture of stale/missing rows and conflict/unknown-origin rows still includes every conflict/unknown-origin keep path; automatic repairs must not replace those choices with a bare command.
@@ -178,9 +178,9 @@ git commit -m "feat(update): choose conflicts with --keep and --overwrite"
   - Fresh init prints no `Next:` line.
   - The same no-manifest case with `pm: 'npm'` prints `Next: npx --yes @atharvdange/toolchain update --pm npm --keep '.prettierrc'`, so the doctor path uses the project's manager and not a fixed pnpm.
 
-- [ ] **Step 2: Run** `pnpm vitest run src/manifest/report.test.ts src/commands/doctor.test.ts`. Expected: FAIL.
+- [x] **Step 2: Run** `pnpm vitest run src/manifest/report.test.ts src/commands/doctor.test.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Implement.**
+- [x] **Step 3: Implement.**
   - Paths come from rows where `needsAction` holds and the state is conflict or unknown-origin.
   - If there are conflict/unknown-origin paths, include all of them even when other rows need action or the manifest is missing. Otherwise return the bare command for an automatic repair or missing manifest. Return `undefined` when neither applies. A `removed-locally` hook alone is not an automatic repair; its repair line already covers it.
   - In doctor:
@@ -189,9 +189,9 @@ git commit -m "feat(update): choose conflicts with --keep and --overwrite"
     - Print `Next: <cmd>` last when `nextCommand` returns one.
   - Add one README sentence.
 
-- [ ] **Step 4: Run** `pnpm test`. Expected: PASS.
+- [x] **Step 4: Run** `pnpm test`. Expected: PASS.
 
-- [ ] **Step 5: Review the diff.** Commit only on Atharv's explicit request after full lint, typecheck and tests pass. Suggested commands for that later request:
+- [x] **Step 5: Review the diff.** Commit only on Atharv's explicit request after full lint, typecheck and tests pass. Suggested commands for that later request:
 
 ```bash
 git add src/manifest/report.ts src/manifest/report.test.ts src/commands/doctor.ts src/commands/doctor.test.ts README.md

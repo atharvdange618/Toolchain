@@ -2,7 +2,7 @@ import { effectiveScripts } from '../generators/entry.js';
 import { withHookWants } from '../generators/husky.js';
 import { needsAction } from '../manifest/classify.js';
 import { compareProject, loadProject, trackedEntries } from '../manifest/project.js';
-import { reportComparisons } from '../manifest/report.js';
+import { nextCommand, reportComparisons } from '../manifest/report.js';
 import { error } from '../utils/logger.js';
 
 export function doctor(options: { pm?: string; targetDir?: string }): number {
@@ -18,10 +18,11 @@ export function doctor(options: { pm?: string; targetDir?: string }): number {
       ),
     };
     const rows = compareProject(project, trackedEntries(plan));
-    reportComparisons(rows, { hasManifest: project.manifest !== undefined });
-    if (project.manifest === undefined) {
-      console.log('No .toolchain.json found. Run interactive update to adopt this project.');
-    }
+    const hasManifest = project.manifest !== undefined;
+    reportComparisons(rows, { hasManifest });
+    if (!hasManifest) console.log('No .toolchain.json found.');
+    const next = nextCommand(rows, project.pm, hasManifest);
+    if (next !== undefined) console.log(`Next: ${next}`);
     return rows.some(needsAction) ? 1 : 0;
   } catch (error_) {
     error(error_ instanceof Error ? error_.message : String(error_));

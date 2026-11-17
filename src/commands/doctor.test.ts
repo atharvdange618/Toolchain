@@ -163,8 +163,31 @@ describe('doctor', () => {
     rmSync(path.join(dir, '.toolchain.json'));
     if (differing) writeFileSync(path.join(dir, '.prettierrc'), 'custom\n');
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(differing ? 1 : 0);
-    expect(output()).toContain('interactive update');
-    expect(output()).toContain('adopt');
+    expect(output()).toContain('No .toolchain.json found.');
+    expect(output()).not.toContain('interactive');
+  });
+
+  it.each([
+    ['pnpm', 'pnpm dlx'],
+    ['npm', 'npx --yes'],
+  ])('prints the %s update command that adopts a legacy project', async (pm, dlx) => {
+    // Hooks name the manager, so generate them with the one doctor checks.
+    await init({ pm, targetDir: dir, yes: true });
+    stdout.mockClear();
+    rmSync(path.join(dir, '.toolchain.json'));
+    writeFileSync(path.join(dir, '.prettierrc'), 'custom\n');
+    expect(doctor({ targetDir: dir, pm })).toBe(1);
+    const text = output();
+    expect(text).toContain('No .toolchain.json found.');
+    expect(text.trimEnd().split('\n').at(-1)).toBe(
+      `Next: ${dlx} @atharvdange/toolchain update --pm ${pm} --keep '.prettierrc'`,
+    );
+    expect(text).not.toContain('interactive');
+  });
+
+  it('prints no next command after a fresh init', () => {
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
+    expect(output()).not.toContain('Next:');
   });
 
   it('checks hooks against disk scripts after intentional typecheck deletion', () => {

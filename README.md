@@ -84,7 +84,7 @@ pnpm dlx @atharvdange/toolchain doctor
 pnpm dlx @atharvdange/toolchain doctor --pm pnpm
 ```
 
-`doctor` compares the current generators, disk and `.toolchain.json` without writes, registry lookups, installs or Husky setup. It shows changes by file and entry, with `- disk` and `+ want` lines.
+`doctor` compares the current generators, disk and `.toolchain.json` without writes, registry lookups, installs or Husky setup. It shows changes by file and entry, with `- disk` and `+ want` lines. When something needs action or the project has no manifest, it ends with a `Next:` line holding the `update` command to run, with a `--keep` for every conflicting or unknown-origin entry; swap any of them for `--overwrite` to take the generated value.
 
 Both commands resolve the package manager from `--pm`, then the project itself (a lockfile or `devEngines`), then the value recorded in `.toolchain.json`, then npm. The package manager that ran the CLI does not count, so `pnpm dlx @atharvdange/toolchain doctor` checks an npm project against its own hooks instead of reporting them stale.
 
@@ -112,7 +112,7 @@ pnpm dlx @atharvdange/toolchain update --pm pnpm --keep '.prettierrc' --overwrit
 
 With no terminal and no `--yes`, `update` stops before writing and prints the command to rerun, with a `--keep` for each open entry plus every flag you already passed. The command uses your project's runner (`npx --yes`, `bunx`, `pnpm dlx` or `yarn dlx`) and quotes paths for a POSIX shell such as Git Bash. After `update --yes` keeps entries without a choice, it prints the same kind of command as `Next:`.
 
-For a project without `.toolchain.json`, run `doctor` first, then interactive `update`. Matching entries get a base automatically; differing entries need your choice because there is no earlier base. Review the diff and commit the manifest with the resulting configs. Re-running `init` would replace generated configs and scripts, so use it only when you want that reset.
+For a project without `.toolchain.json`, run `doctor` first, then interactive `update` or the command on its `Next:` line. Matching entries get a base automatically; differing entries need your choice because there is no earlier base. Review the diff and commit the manifest with the resulting configs. Re-running `init` would replace generated configs and scripts, so use it only when you want that reset.
 
 Deleted scripts and hooks stay deleted. A deleted required hook still fails `doctor`: restore it from Git, or remove just its path from `.toolchain.json`'s `entries` object and run `update` to recreate it. Hooks follow the scripts you keep, including deleted `typecheck` scripts. Missing required devDependencies are the exception: `update` restores them even after a local deletion, keeps existing version ranges, and never removes a dependency.
 

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 import type { Comparison, State } from './classify.js';
-import { reportComparisons } from './report.js';
+import { updateCommand } from './choices.js';
+import { nextCommand, reportComparisons } from './report.js';
 
 let stdout: MockInstance<typeof console.log>;
 
@@ -102,5 +103,52 @@ describe('reportComparisons', () => {
     expect(text).toContain('    stricter than generated ("error" vs "warn"); keeping it is safe.');
     expect(text.match(/keeping it is safe/g)).toHaveLength(1);
     expect(text).toContain('0 need action');
+  });
+});
+
+describe('nextCommand', () => {
+  it('keeps every conflict and unknown-origin path', () => {
+    expect(
+      nextCommand(
+        [row('unknown-origin', '.prettierrc'), row('conflict', '.editorconfig')],
+        'npm',
+        true,
+      ),
+    ).toBe(updateCommand('npm', ['.editorconfig', '.prettierrc']));
+  });
+
+  it.each(['stale', 'missing'] as const)('gives the bare command for a lone %s row', (state) => {
+    expect(nextCommand([row(state)], 'npm', true)).toBe(updateCommand('npm', []));
+  });
+
+  it('keeps choice paths when automatic repairs are also needed', () => {
+    expect(
+      nextCommand(
+        [
+          row('stale'),
+          row('missing'),
+          row('conflict', '.editorconfig'),
+          row('unknown-origin', '.prettierrc'),
+        ],
+        'npm',
+        true,
+      ),
+    ).toBe(updateCommand('npm', ['.editorconfig', '.prettierrc']));
+  });
+
+  it('suggests adoption only when the manifest is missing', () => {
+    expect(nextCommand([row('in-sync')], 'npm', true)).toBeUndefined();
+    expect(nextCommand([row('in-sync')], 'npm', false)).toBe(updateCommand('npm', []));
+  });
+
+  // The hook repair line already says what to do; update would not recreate it.
+  it('gives nothing for a lone locally removed hook', () => {
+    expect(
+      nextCommand(
+        [{ ...row('removed-locally', '.husky/pre-commit'), want: 'hook\n' }],
+        'npm',
+        true,
+      ),
+    ).toBeUndefined();
   });
 });

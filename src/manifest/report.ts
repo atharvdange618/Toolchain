@@ -1,3 +1,5 @@
+import type { PackageManager } from '../detectors/project.js';
+import { updateCommand } from './choices.js';
 import { type Comparison, isStricterRule, needsAction, type State } from './classify.js';
 import { isHookPath } from './manifest.js';
 
@@ -59,4 +61,23 @@ export function reportComparisons(
   console.log(
     `${rows.filter((row) => row.state === 'in-sync').length} in sync; ${rows.filter(needsAction).length} need action`,
   );
+}
+
+// The command that resolves doctor's findings. Every choice row gets a --keep,
+// even when automatic repairs also need running, so the command is complete.
+// A locally removed hook is left out: update keeps the deletion, and the repair
+// line printed with it already says what to do.
+export function nextCommand(
+  rows: Comparison[],
+  pm: PackageManager,
+  hasManifest: boolean,
+): string | undefined {
+  const actionable = rows.filter(needsAction);
+  const keep = actionable
+    .filter((row) => row.state === 'conflict' || row.state === 'unknown-origin')
+    .map((row) => row.path);
+  const repairs = actionable.some(
+    (row) => !(row.state === 'removed-locally' && isHookPath(row.path)),
+  );
+  return keep.length > 0 || repairs || !hasManifest ? updateCommand(pm, keep) : undefined;
 }
