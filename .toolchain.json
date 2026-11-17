@@ -58,7 +58,7 @@
     "package.json#devDependencies.oxlint-tsgolint": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.prettier": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
     "package.json#devDependencies.typescript": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
-    "package.json#lint-staged": "eab675a66776d3b33b6fa59aaec950cf17a8ed0cb9e0e5b34fa71ede27591e9b",
+    "package.json#lint-staged": "e678121c345f4113a1c1dd07952307dacf4ba7ae833f40ac951bf37085a3f621",
     "package.json#scripts.commit": "2b45d6ee19e86226e9c97aa4d11b297d65e4615577de2216fd5b05e9e5de2dd8",
     "package.json#scripts.format": "b2fc26bc978872fdb2ac7a7142ea963e9b833e19fef612fdd83225103888ffe5",
     "package.json#scripts.format:check": "db78f5b9e0782b977952d9960b35aa24f6b84e7e1b4a4a1a853fd0e6cb5b901c",

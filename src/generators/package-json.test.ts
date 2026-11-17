@@ -75,7 +75,11 @@ describe('updatePackageJson', () => {
     });
     expect(pkg['lint-staged']).toEqual({
       '*.{json,md,css}': ['prettier --write'],
-      '*.{ts,tsx}': ['oxlint --fix', 'oxlint', 'prettier --write'],
+      '*.{ts,tsx}': [
+        'oxlint --fix --no-error-on-unmatched-pattern',
+        'oxlint --no-error-on-unmatched-pattern',
+        'prettier --write',
+      ],
     });
     expect(pkg['devDependencies']).toMatchObject({ oxlint: '^1.0.0', prettier: '^3.0.0' });
   });
@@ -88,8 +92,8 @@ describe('updatePackageJson', () => {
 
     expect(Object.keys(lintStaged)).toEqual(['*.{json,md,css}', '*.{js,jsx,cjs,mjs,ts,tsx}']);
     expect(lintStaged['*.{js,jsx,cjs,mjs,ts,tsx}']).toEqual([
-      'oxlint --fix',
-      'oxlint',
+      'oxlint --fix --no-error-on-unmatched-pattern',
+      'oxlint --no-error-on-unmatched-pattern',
       'prettier --write',
     ]);
   });
