@@ -19,11 +19,15 @@ const SCRIPTS: Record<string, string> = {
 // typecheck to fail on it with a less obvious message.
 // Expo keeps plain .js sources and config plugins, which the .ts glob would
 // skip entirely.
+// The glob matches files .oxlintrc.json ignores (*.config.*, components/ui),
+// and oxlint exits 1 when every file it gets is ignored, so a commit staging
+// only those would fail. The flag stops that; real lint errors still fail.
 function lintStaged(info: ProjectInfo): Record<string, string[]> {
   const code = info.framework === 'expo' ? '*.{js,jsx,cjs,mjs,ts,tsx}' : '*.{ts,tsx}';
+  const unmatched = '--no-error-on-unmatched-pattern';
   return {
     '*.{json,md,css}': ['prettier --write'],
-    [code]: ['oxlint --fix', 'oxlint', 'prettier --write'],
+    [code]: [`oxlint --fix ${unmatched}`, `oxlint ${unmatched}`, 'prettier --write'],
   };
 }
 

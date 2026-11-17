@@ -18,6 +18,10 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 - `init` prints its warnings and notes together before writing, and reports 4 steps instead of 8. The files it writes are unchanged.
 - `init` names the workspace imports that type-aware lint can't resolve, meaning those with neither a tsconfig `references` entry in the importing package nor a built `.d.ts`. They report under the `no-unsafe-*` rules until fixed, which is also what `typecheck` reports on that tree, so the config no longer changes to avoid them.
 
+### Fixed
+
+- A commit that staged only files `.oxlintrc.json` ignores, such as `vite.config.ts`, `next.config.ts` or a `components/ui` file, failed the pre-commit hook: oxlint found nothing to lint and exited 1. Both oxlint steps in `lint-staged` now pass `--no-error-on-unmatched-pattern`, and real lint errors still fail the commit. `update` applies it to an unedited `lint-staged` with no prompt. ([#7](https://github.com/atharvdange618/toolchain/issues/7))
+
 ### Notes
 
 - Run `doctor`, then interactive `update` to adopt a project without a manifest and review the new `.oxlintrc.json`. A monorepo whose packages neither reference each other nor get built before lint will report those imports; a `references` entry fixes it with no build step.
