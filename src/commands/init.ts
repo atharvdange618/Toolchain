@@ -93,7 +93,6 @@ export async function init(options: {
   }
 
   if (!options.nested) intro('Toolchain setup');
-  step('Detecting project environment...');
   const projectInfo = detect(targetDir);
   // Resolved once so the hooks and the install can't disagree.
   const pm: PackageManager =
@@ -163,10 +162,8 @@ export async function init(options: {
     error(error_ instanceof Error ? error_.message : 'Failed to record .toolchain.json.');
     return process.exit(1);
   }
-  for (const entry of plan.entries) {
-    if (!entry.path.startsWith('package.json#')) success(entry.path);
-  }
-  success('package.json updated with scripts, lint-staged, and devDependencies');
+  const fileCount = plan.entries.filter((entry) => !entry.path.startsWith('package.json#')).length;
+  success(`Wrote ${fileCount} config files, updated package.json and recorded .toolchain.json`);
   if (projectInfo.isMonorepo) warnAboutWorkspacePackages(targetDir);
 
   step(`Installing dependencies with ${pm}...`);

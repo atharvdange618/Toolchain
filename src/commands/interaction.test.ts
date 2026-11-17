@@ -49,6 +49,18 @@ afterEach(() => {
 });
 
 describe('init interaction', () => {
+  it('summarizes written files while keeping warnings visible', async () => {
+    await init({ pm: 'pnpm', yes: true });
+    const output = stdout.mock.calls.map(([chunk]) => String(chunk)).join('\n');
+    expect(output).toContain(
+      'Wrote 9 config files, updated package.json and recorded .toolchain.json',
+    );
+    expect(output).not.toMatch(/^[^\n]*\s\.editorconfig\s*$/m);
+    expect(output).toContain('No TypeScript files found');
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(true);
+    expect(existsSync(path.join(dir, '.husky', 'pre-commit'))).toBe(true);
+  });
+
   it.each([false, clack.CANCEL_SYMBOL] as const)(
     'aborts on %s before writes or registry lookups',
     async (answer) => {
@@ -121,6 +133,15 @@ describe('scaffold interaction', () => {
     expect(option?.hint).toEqual(expect.any(String));
     expect(option?.label).toBe('plain');
     const output = stdout.mock.calls.map(([chunk]) => String(chunk)).join('\n');
+    expect(output).toContain('Created 4 project files');
+    expect(output).toContain(
+      'Wrote 8 config files, updated package.json and recorded .toolchain.json',
+    );
+    expect(output).not.toContain('Creating project directory...');
+    expect(output).not.toContain('Writing package.json...');
+    expect(output).not.toContain('Setting up toolchain...');
+    expect(output).not.toMatch(/^[^\n]*\ssrc\/index\.ts\s*$/m);
+    expect(existsSync(path.join(dir, 'demo', 'src', 'index.ts'))).toBe(true);
     expect(output).toContain('Project "demo" is ready!');
     expect(output).not.toContain('Toolchain is ready!');
     expect(output.match(/Next steps/g)).toHaveLength(1);

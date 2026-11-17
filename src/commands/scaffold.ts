@@ -121,8 +121,6 @@ export async function scaffold(
     }
   }
 
-  info(`Creating ${template} project "${projectName}"...`);
-
   const ctx: TemplateContext = {
     packageManager: pm,
     projectName,
@@ -148,22 +146,19 @@ export async function scaffold(
     success('Project files created by official tooling');
   } else {
     // File-based template - create directory and write files ourselves
-    step('Creating project directory...');
+    step(`Creating ${template} project files...`);
     mkdirSync(targetDir, { recursive: true });
 
-    step('Generating project files...');
     for (const file of result.files) {
       const filePath = path.join(targetDir, file.path);
       writeFile(filePath, file.content);
-      success(file.path);
     }
 
-    step('Writing package.json...');
     writeFile(
       path.join(targetDir, 'package.json'),
       JSON.stringify(result.packageJson, null, 2) + '\n',
     );
-    success('package.json');
+    success(`Created ${result.files.length + 1} project files`);
   }
 
   // create-next-app makes a repo, create-vite doesn't. Husky needs one.
@@ -177,7 +172,6 @@ export async function scaffold(
     }
   }
 
-  step('Setting up toolchain...');
   await init({ pm, targetDir, yes: true, nested: true });
 
   // Generated code (ours, create-vite's, create-next-app's) doesn't follow the
