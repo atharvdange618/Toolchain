@@ -1,5 +1,3 @@
-import { execSync } from 'node:child_process';
-
 import { effectiveScripts, type Entry } from '../generators/entry.js';
 import { withHookWants } from '../generators/husky.js';
 import { assertPattern, type ChoiceFlags, updateCommand } from '../manifest/choices.js';
@@ -14,7 +12,8 @@ import {
   writeManifest,
 } from '../manifest/write.js';
 import { error, info, intro, outro, warn } from '../utils/logger.js';
-import { withProgress } from '../utils/progress.js';
+import { isCommandCancelled } from '../utils/process.js';
+import { runTask, withProgress } from '../utils/progress.js';
 import { getToolchainDeps } from '../utils/versions.js';
 import { warnAboutWorkspacePackages, warnAboutWorkspaceTypes } from './init.js';
 import { chooseConflicts } from './update-prompts.js';
@@ -125,13 +124,20 @@ export async function update(options: {
     for (const file of completed) info(`Updated: ${file}`);
 
     let failed = false;
+    let cancelled = false;
     if (missing.length > 0) {
       try {
-        execSync(`${project.pm} install`, { cwd: project.targetDir, stdio: 'inherit' });
-      } catch {
+        await runTask(`${project.pm} install`, {
+          cwd: project.targetDir,
+          title: `Installing dependencies with ${project.pm}`,
+          successMessage: 'Dependencies installed',
+        });
+      } catch (error_) {
         failed = true;
+        cancelled = isCommandCancelled(error_);
+        // Printed before the manifest save, so a second Ctrl+C still leaves the retry line.
         error(
-          `Failed to install dependencies. Run "${project.pm} install" manually. A rerun of update will not retry install automatically because the dependencies are now declared.`,
+          `${cancelled ? 'Install cancelled' : 'Failed to install dependencies'}. Run "${project.pm} install" manually. A rerun of update will not retry install automatically because the dependencies are now declared.`,
         );
       }
     }
@@ -143,7 +149,7 @@ export async function update(options: {
         `${error_ instanceof Error ? error_.message : String(error_)}. Could not save .toolchain.json; rerun update to record the applied content.`,
       );
     }
-    if (failed) return 1;
+    if (failed) return cancelled ? 130 : 1;
 
     const unresolvedPaths: string[] = [];
     for (const { row, action } of decisions) {

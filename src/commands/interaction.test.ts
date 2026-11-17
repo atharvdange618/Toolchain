@@ -8,6 +8,10 @@ import { init } from './init.js';
 import { scaffold } from './scaffold.js';
 
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
+vi.mock('../utils/progress.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/progress.js')>()),
+  runTask: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@clack/prompts', async (importOriginal) => ({
   ...(await importOriginal<typeof clack>()),
   confirm: vi.fn(),
@@ -19,6 +23,7 @@ vi.mock('../utils/versions.js', async (importOriginal) => ({
 }));
 
 const { execSync } = await import('node:child_process');
+const { runTask } = await import('../utils/progress.js');
 const { getToolchainDeps } = await import('../utils/versions.js');
 let dir: string;
 let stdout: MockInstance<typeof process.stdout.write>;
@@ -36,6 +41,7 @@ beforeEach(() => {
   vi.mocked(clack.confirm).mockReset().mockResolvedValue(true);
   vi.mocked(clack.select).mockReset().mockResolvedValue('plain');
   vi.mocked(execSync).mockReset();
+  vi.mocked(runTask).mockClear();
   vi.mocked(getToolchainDeps).mockClear();
 });
 
@@ -68,7 +74,7 @@ describe('init interaction', () => {
       await init({ pm: 'pnpm' });
       expect(readdirSync(dir)).toEqual(['package.json']);
       expect(getToolchainDeps).not.toHaveBeenCalled();
-      expect(execSync).not.toHaveBeenCalled();
+      expect(runTask).not.toHaveBeenCalled();
     },
   );
 

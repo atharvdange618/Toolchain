@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { confirm, isCancel } from '@clack/prompts';
@@ -21,7 +20,7 @@ import { writeManifest } from '../manifest/write.js';
 import { readJson } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
 import { isCommandCancelled } from '../utils/process.js';
-import { withProgress } from '../utils/progress.js';
+import { runTask, withProgress } from '../utils/progress.js';
 import { getToolchainDeps } from '../utils/versions.js';
 
 // v2 lints with oxlint, so an ESLint config left in the project does nothing.
@@ -173,23 +172,30 @@ export async function init(options: {
   success(`Wrote ${fileCount} config files, updated package.json and recorded .toolchain.json`);
   if (projectInfo.isMonorepo) warnAboutWorkspacePackages(targetDir);
 
-  step(`Installing dependencies with ${pm}...`);
+  // Cancellation propagates, so neither Husky nor the success lines run after Ctrl+C.
   try {
-    execSync(`${pm} install`, { cwd: targetDir, stdio: 'inherit' });
-  } catch {
+    await runTask(`${pm} install`, {
+      cwd: targetDir,
+      title: `Installing dependencies with ${pm}`,
+      successMessage: 'Dependencies installed',
+    });
+  } catch (error_) {
+    if (isCommandCancelled(error_)) throw error_;
     error(`Failed to install dependencies with ${pm}. Run "${pm} install" manually.`);
-    process.exit(1);
+    return process.exit(1);
   }
-  success('Dependencies installed');
 
-  step('Initializing Husky...');
   try {
-    execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
-  } catch {
+    await runTask(`${pmExec(pm)} husky`, {
+      cwd: targetDir,
+      title: 'Initializing Husky',
+      successMessage: 'Husky initialized',
+    });
+  } catch (error_) {
+    if (isCommandCancelled(error_)) throw error_;
     error('Failed to initialize Husky. Run "husky" manually.');
-    process.exit(1);
+    return process.exit(1);
   }
-  success('Husky initialized');
 
   if (options.nested) return;
   info(

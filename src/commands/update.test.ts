@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 import { hashEntry, parseManifest, serializeManifest } from '../manifest/manifest.js';
 import * as writer from '../manifest/write.js';
 import { CommandCancelledError } from '../utils/process.js';
+import { runTask } from '../utils/progress.js';
 import { getToolchainDeps, TOOLCHAIN_DEP_NAMES } from '../utils/versions.js';
 import { doctor } from './doctor.js';
 import { init } from './init.js';
@@ -19,7 +19,10 @@ vi.mock('@clack/prompts', async (importOriginal) => ({
 }));
 
 vi.mock('node:fs', async (importOriginal) => ({ ...(await importOriginal<typeof fs>()) }));
-vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
+vi.mock('../utils/progress.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/progress.js')>()),
+  runTask: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../utils/versions.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../utils/versions.js')>();
   return {
@@ -93,7 +96,7 @@ async function fresh(pkg: Record<string, unknown>): Promise<void> {
   fs.mkdirSync(dir);
   putJson('package.json', pkg);
   await init({ targetDir: dir, yes: true, pm: 'pnpm' });
-  vi.mocked(execSync).mockClear();
+  vi.mocked(runTask).mockClear();
   vi.mocked(getToolchainDeps).mockClear();
 }
 
@@ -105,7 +108,7 @@ beforeEach(async () => {
   Object.defineProperty(process.stdin, 'isTTY', { configurable: true, get: () => true });
   Object.defineProperty(process.stdout, 'isTTY', { configurable: true, get: () => true });
   select = vi.mocked(clack.select).mockReset().mockResolvedValue('keep');
-  vi.mocked(execSync).mockReset();
+  vi.mocked(runTask).mockReset();
   vi.mocked(getToolchainDeps)
     .mockReset()
     .mockImplementation((names = TOOLCHAIN_DEP_NAMES) =>
@@ -185,7 +188,7 @@ describe('update decisions and adoption', () => {
     expect(await run(false)).toBe(1);
     expect(files()).toEqual(before);
     expect(stderr()).toContain('cancelled');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('fails before writing when a non-TTY needs a choice', async () => {
@@ -232,7 +235,7 @@ describe('--keep and --overwrite', () => {
   function expectNothingRan(before: Record<string, string>): void {
     expect(files()).toEqual(before);
     expect(getToolchainDeps).not.toHaveBeenCalled();
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(select).not.toHaveBeenCalled();
   }
 
@@ -509,7 +512,7 @@ describe('script-first hooks and root-only scope', () => {
     expect(stdout()).not.toContain('root now uses TypeScript 7');
     expect(stdout()).not.toContain('Removing');
     expect(stdout()).not.toContain('Overwriting');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 });
 
@@ -548,7 +551,7 @@ describe('dependency restoration and recovery', () => {
       await vi.waitFor(() => expect(getToolchainDeps).toHaveBeenCalled());
       expect(prepare).not.toHaveBeenCalled();
       expect(files()).toEqual(before);
-      expect(execSync).not.toHaveBeenCalled();
+      expect(runTask).not.toHaveBeenCalled();
     } finally {
       complete({ husky: '^9.0.0' });
       expect(await pending).toBe(0);
@@ -564,7 +567,7 @@ describe('dependency restoration and recovery', () => {
     vi.mocked(getToolchainDeps).mockRejectedValueOnce(new CommandCancelledError('npm view husky'));
     expect(await run()).toBe(1);
     expect(files()).toEqual(before);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(stdout()).not.toContain('Toolchain update complete');
   });
 
@@ -576,9 +579,10 @@ describe('dependency restoration and recovery', () => {
     expect(await run(true, 'yarn')).toBe(0);
     expect(getToolchainDeps).toHaveBeenCalledExactlyOnceWith(['husky'], expect.any(AbortSignal));
     expect(json('package.json')['devDependencies']).toEqual({ ...before, husky: '^7.0.2' });
-    expect(execSync).toHaveBeenCalledExactlyOnceWith('yarn install', {
+    expect(runTask).toHaveBeenCalledExactlyOnceWith('yarn install', {
       cwd: dir,
-      stdio: 'inherit',
+      title: 'Installing dependencies with yarn',
+      successMessage: 'Dependencies installed',
     });
     expect(
       parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.husky'],
@@ -600,9 +604,10 @@ describe('dependency restoration and recovery', () => {
     expect((json('package.json')['devDependencies'] as Record<string, string>)['typescript']).toBe(
       '^7.0.2',
     );
-    expect(execSync).toHaveBeenCalledExactlyOnceWith('pnpm install', {
+    expect(runTask).toHaveBeenCalledExactlyOnceWith('pnpm install', {
       cwd: dir,
-      stdio: 'inherit',
+      title: 'Installing dependencies with pnpm',
+      successMessage: 'Dependencies installed',
     });
   });
 
@@ -618,7 +623,7 @@ describe('dependency restoration and recovery', () => {
     expect(await run()).toBe(1);
     expect(files()).toEqual(before);
     expect(stderr()).toContain('registry down');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('aborts if an input changes during a prompt without applying prepared decisions', async () => {
@@ -652,7 +657,7 @@ describe('dependency restoration and recovery', () => {
     expect(read('.prettierrc')).toBe('old\n');
     expect(read('.toolchain.json')).toBe(manifest);
     expect(stderr()).toContain('.prettierignore changed during update');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('completes every backup before content writes and aborts all writes on backup failure', async () => {
@@ -672,7 +677,7 @@ describe('dependency restoration and recovery', () => {
       expect(fs.readFileSync(path.join(dir, file)).toString('base64')).toBe(content);
     }
     expect(stderr()).toContain('backup denied');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('reports completed writes, retains the old base and converges after a partial write failure', async () => {
@@ -689,7 +694,7 @@ describe('dependency restoration and recovery', () => {
     expect(read('.prettierrc')).toBe('old\n');
     expect(read('.toolchain.json')).toBe(manifest);
     expect(stderr()).toContain('Completed writes: .editorconfig');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     fault.mockRestore();
     expect(await run()).toBe(0);
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
@@ -701,9 +706,7 @@ describe('dependency restoration and recovery', () => {
     });
     base('package.json#devDependencies.husky', undefined);
     stale();
-    vi.mocked(execSync).mockImplementationOnce(() => {
-      throw new Error('install denied');
-    });
+    vi.mocked(runTask).mockRejectedValueOnce(new Error('install denied'));
     expect(await run()).toBe(1);
     expect(
       parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.husky'],
@@ -713,7 +716,30 @@ describe('dependency restoration and recovery', () => {
     expect(stderr()).toContain('will not retry');
     expect(stdout()).not.toContain('Toolchain update complete.');
     expect(await run()).toBe(0);
-    expect(execSync).toHaveBeenCalledTimes(1);
+    expect(runTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves applied content after a cancelled install and exits 130 with the manual command', async () => {
+    editPackage((pkg) => {
+      delete (pkg['devDependencies'] as Record<string, string>)['husky'];
+    });
+    let cancel: (reason: unknown) => void = () => {};
+    vi.mocked(runTask).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          cancel = reject;
+        }),
+    );
+    const pending = run();
+    await vi.waitFor(() => expect(runTask).toHaveBeenCalled());
+    expect(stdout()).not.toContain('Toolchain update complete');
+    cancel(new CommandCancelledError('pnpm install'));
+    expect(await pending).toBe(130);
+    expect(
+      parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.husky'],
+    ).toBe(hashEntry('package.json#devDependencies.husky', 'true'));
+    expect(stderr()).toContain('Install cancelled. Run "pnpm install" manually.');
+    expect(stdout()).not.toContain('Toolchain update complete');
   });
 
   it('prints the selected manual install command when declarations complete before a later write fails', async () => {
@@ -736,11 +762,11 @@ describe('dependency restoration and recovery', () => {
     expect(stderr()).toContain('hook rename denied');
     expect(stderr()).toContain('Run "yarn install" manually.');
     expect(stderr()).toContain('will not retry install automatically');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     fault.mockRestore();
     expect(await run(true, 'yarn')).toBe(0);
     expect(doctor({ targetDir: dir, pm: 'yarn' })).toBe(0);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it.each(['content', 'backup'])(
@@ -768,7 +794,7 @@ describe('dependency restoration and recovery', () => {
       expect(read('.toolchain.json')).toBe(manifest);
       expect(stderr()).toContain(`${failure} denied`);
       expect(stderr()).not.toContain('install" manually');
-      expect(execSync).not.toHaveBeenCalled();
+      expect(runTask).not.toHaveBeenCalled();
     },
   );
 
@@ -781,9 +807,7 @@ describe('dependency restoration and recovery', () => {
         editPackage((pkg) => {
           delete (pkg['devDependencies'] as Record<string, string>)['husky'];
         });
-        vi.mocked(execSync).mockImplementationOnce(() => {
-          throw new Error('install denied');
-        });
+        vi.mocked(runTask).mockRejectedValueOnce(new Error('install denied'));
       }
       vi.spyOn(writer, 'writeManifest').mockImplementationOnce(() => {
         throw new Error('manifest denied');
@@ -807,7 +831,7 @@ describe('dependency restoration and recovery', () => {
     expect(files()).toEqual(before);
     expect(rename).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(getToolchainDeps).not.toHaveBeenCalled();
   });
 
@@ -824,7 +848,7 @@ describe('dependency restoration and recovery', () => {
       parseManifest(read('.toolchain.json'))?.entries['package.json#devDependencies.old-tool'],
     ).toBeUndefined();
     expect(getToolchainDeps).not.toHaveBeenCalled();
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('preflights symlink targets before prompts and dependency lookups', async () => {
@@ -845,7 +869,7 @@ describe('dependency restoration and recovery', () => {
     expect(files()).toEqual(before);
     expect(select).not.toHaveBeenCalled();
     expect(getToolchainDeps).not.toHaveBeenCalled();
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(stderr()).toContain('symlink');
   });
 
@@ -861,7 +885,7 @@ describe('dependency restoration and recovery', () => {
     expect(await run()).toBe(1);
     expect(files()).toEqual(before);
     expect(stderr()).not.toBe('');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(getToolchainDeps).not.toHaveBeenCalled();
   });
 
@@ -869,7 +893,7 @@ describe('dependency restoration and recovery', () => {
     fs.rmSync(path.join(dir, '.toolchain.json'));
     fs.mkdirSync(path.join(dir, '.toolchain.json'));
     expect(await run()).toBe(1);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('returns 1 for invalid input instead of exiting the process', async () => {
@@ -889,7 +913,7 @@ describe('package manager provenance', () => {
     putJson('package.json', { name: 'demo' });
     put('package-lock.json', '{}');
     await init({ targetDir: dir, yes: true, pm: 'npm' });
-    vi.mocked(execSync).mockClear();
+    vi.mocked(runTask).mockClear();
     vi.mocked(getToolchainDeps).mockClear();
     const hooks = { commitMsg: read('.husky/commit-msg'), preCommit: read('.husky/pre-commit') };
     expect(hooks.preCommit).toContain('npm exec --');

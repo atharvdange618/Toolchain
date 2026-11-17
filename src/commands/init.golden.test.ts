@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
+vi.mock('../utils/progress.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/progress.js')>()),
+  runTask: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../utils/versions.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/versions.js')>()),
   getToolchainDeps: vi

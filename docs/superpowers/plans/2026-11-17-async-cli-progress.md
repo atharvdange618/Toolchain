@@ -179,12 +179,20 @@ Each item has an owning test task below:
 
 **Files:** `src/commands/init.ts`, `update.ts`, their tests, `init.golden.test.ts`, `interaction.test.ts`, `doctor.test.ts`, `index.test.ts`.
 
-- [ ] Write deferred-promise tests proving init awaits install before Husky and completion; rejection retains the current manual-retry message and skips later phases. Cancellation also skips Husky and success.
-- [ ] For update, test that an install rejection AND cancellation after package.json writes both save the applied-content manifest, return nonzero, and print the manual install retry. Preserve current behavior for partial content-write failure and manifest-save failure.
-- [ ] Add tests proving prompt cancellation still causes no writes/lookups/child tasks, `--yes` and explicit flag choices still bypass prompts, and no-op update runs no install. Doctor text/JSON must invoke neither process runner nor progress helper.
-- [ ] Run focused tests and observe failures; replace install/Husky `execSync` calls with awaited `runTask` calls. Remove paired headings/success messages only where `runTask` now owns them, preventing duplicate output.
-- [ ] If issue #11 has separately landed before execution, migrate its uninstall call too and retain all four tests. Ordinary uninstall failure may warn and continue as before; cancellation must abort instead. Do not introduce its helper on this branch merely to satisfy this plan.
-- [ ] Run command tests and golden fixtures. Generated-file snapshots must stay byte-for-byte unchanged. Update child-process mocks to deferred async helpers so missing `await` bugs cannot pass through synchronous mocks.
+- [x] Write deferred-promise tests proving init awaits install before Husky and completion; rejection retains the current manual-retry message and skips later phases. Cancellation also skips Husky and success.
+- [x] For update, test that an install rejection AND cancellation after package.json writes both save the applied-content manifest, return nonzero, and print the manual install retry. Preserve current behavior for partial content-write failure and manifest-save failure.
+- [x] Add tests proving prompt cancellation still causes no writes/lookups/child tasks, `--yes` and explicit flag choices still bypass prompts, and no-op update runs no install. Doctor text/JSON must invoke neither process runner nor progress helper.
+- [x] Run focused tests and observe failures; replace install/Husky `execSync` calls with awaited `runTask` calls. Remove paired headings/success messages only where `runTask` now owns them, preventing duplicate output.
+- [x] If issue #11 has separately landed before execution, migrate its uninstall call too and retain all four tests. Ordinary uninstall failure may warn and continue as before; cancellation must abort instead. Do not introduce its helper on this branch merely to satisfy this plan.
+- [x] Run command tests and golden fixtures. Generated-file snapshots must stay byte-for-byte unchanged. Update child-process mocks to deferred async helpers so missing `await` bugs cannot pass through synchronous mocks.
+
+### Task 4 execution notes, 2026-11-17
+
+- Init and update run install, and init runs Husky, through awaited `runTask`; `runTask` owns their headings and success lines. Init rethrows cancellation (no Husky, no exit call, no ready message); ordinary failure keeps the manual-retry line and exit 1.
+- Update returns 130 on a cancelled install, 1 on a failed one, and saves the applied-content manifest in both cases. Ruling: no second-SIGINT handler. The retry line prints before the synchronous `writeManifest`, during which no signal handler can run, and once `runTask` removes its listeners a second Ctrl+C gets Node's default exit, so the retry line is always already on screen.
+- Command tests mock `runTask` from `progress.js` instead of `execSync`; the real `withProgress` stays. New tests: deferred install blocks Husky and the ready message, init cancellation, update cancellation saving the manifest, and doctor text/JSON calling neither `runTask` nor `withProgress`. `interaction.test.ts` keeps its `execSync` mock for scaffold until Task 5.
+- Issue #11 has not landed on this branch, so no uninstall migration.
+- Verification: lint:strict, typecheck, format:check and 667 tests (4 skipped) passed. Golden snapshots unchanged. Real-terminal Ctrl+C remains for Task 6. Uncommitted.
 
 ## Task 5: Scaffolders and template dependency propagation
 

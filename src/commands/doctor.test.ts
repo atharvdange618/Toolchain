@@ -6,7 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 import { hashEntry, parseManifest, serializeManifest } from '../manifest/manifest.js';
 import { compareProject, loadProject, trackedEntries } from '../manifest/project.js';
 
-vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
+vi.mock('../utils/progress.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../utils/progress.js')>();
+  return {
+    ...original,
+    runTask: vi.fn().mockResolvedValue(undefined),
+    withProgress: vi.fn(original.withProgress),
+  };
+});
 vi.mock('../utils/versions.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../utils/versions.js')>();
   return {
@@ -19,7 +26,7 @@ vi.mock('../utils/versions.js', async (importOriginal) => {
   };
 });
 
-const { execSync } = await import('node:child_process');
+const { runTask, withProgress } = await import('../utils/progress.js');
 const { getToolchainDeps } = await import('../utils/versions.js');
 const { init } = await import('./init.js');
 const { doctor } = await import('./doctor.js');
@@ -68,7 +75,8 @@ beforeEach(async () => {
   stdout = vi.spyOn(console, 'log').mockImplementation(() => {});
   stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   await init({ pm: 'pnpm', targetDir: dir, yes: true });
-  vi.mocked(execSync).mockClear();
+  vi.mocked(runTask).mockClear();
+  vi.mocked(withProgress).mockClear();
   vi.mocked(getToolchainDeps).mockClear();
   stdout.mockClear();
   stdoutWrite.mockClear();
@@ -84,7 +92,8 @@ describe('doctor', () => {
     const before = files();
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
     expect(files()).toEqual(before);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+    expect(withProgress).not.toHaveBeenCalled();
     expect(getToolchainDeps).not.toHaveBeenCalled();
     expect(output()).toContain('0 need action');
     expect(stderr).not.toHaveBeenCalled();
@@ -151,7 +160,7 @@ describe('doctor', () => {
       expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(1);
       expect(output()).toContain(`${state}:`);
       expect(files()).toEqual(before);
-      expect(execSync).not.toHaveBeenCalled();
+      expect(runTask).not.toHaveBeenCalled();
       expect(getToolchainDeps).not.toHaveBeenCalled();
     },
   );
@@ -254,7 +263,7 @@ describe('doctor', () => {
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(1);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining(expected));
     expect(files()).toEqual(before);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(getToolchainDeps).not.toHaveBeenCalled();
   });
 
@@ -304,6 +313,8 @@ describe('doctor --json', () => {
     expect(Object.keys(result)).toEqual(['manifest', 'needsAction', 'next', 'rows']);
     expect(result).toMatchObject({ manifest: true, needsAction: false, next: null });
     expect(result.rows.length).toBeGreaterThan(0);
+    expect(runTask).not.toHaveBeenCalled();
+    expect(withProgress).not.toHaveBeenCalled();
     for (const row of result.rows) {
       expect(Object.keys(row)).toEqual([
         'path',

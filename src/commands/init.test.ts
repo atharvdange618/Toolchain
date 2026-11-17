@@ -9,13 +9,16 @@ import { hashEntry, parseManifest } from '../manifest/manifest.js';
 import * as manifestWriter from '../manifest/write.js';
 import { CommandCancelledError } from '../utils/process.js';
 
-vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
+vi.mock('../utils/progress.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/progress.js')>()),
+  runTask: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../utils/versions.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/versions.js')>()),
   getToolchainDeps: vi.fn().mockResolvedValue({ husky: '^9.0.0', typescript: '^7.0.2' }),
 }));
 
-const { execSync } = await import('node:child_process');
+const { runTask } = await import('../utils/progress.js');
 const { init } = await import('./init.js');
 const { getToolchainDeps } = await import('../utils/versions.js');
 
@@ -25,7 +28,7 @@ beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'toolchain-init-'));
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo' }));
   vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-  vi.mocked(execSync).mockReset();
+  vi.mocked(runTask).mockReset();
 });
 
 afterEach(() => {
@@ -49,7 +52,7 @@ describe('init manifest', () => {
       await vi.waitFor(() => expect(getToolchainDeps).toHaveBeenCalled());
       expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
       expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
-      expect(execSync).not.toHaveBeenCalled();
+      expect(runTask).not.toHaveBeenCalled();
     } finally {
       complete({ husky: '^9.0.0', typescript: '^7.0.2' });
       await pending;
@@ -71,7 +74,7 @@ describe('init manifest', () => {
       path.join(dir, 'package.json'),
       JSON.stringify({ devDependencies: { eslint: '^9.0.0' }, name: 'demo' }),
     );
-    vi.mocked(execSync).mockImplementationOnce(() => {
+    vi.mocked(runTask).mockImplementationOnce(() => {
       const manifest = readManifest();
       expect(manifest).toBeDefined();
       for (const file of [
@@ -95,12 +98,12 @@ describe('init manifest', () => {
       expect(manifest).not.toHaveProperty(['.gitattributes']);
       expect(manifest).not.toHaveProperty(['tsconfig.json']);
       expect(manifest).not.toHaveProperty(['package.json#devDependencies.eslint']);
-      return '';
+      return Promise.resolve();
     });
 
     await init({ pm: 'pnpm', targetDir: dir, yes: true });
 
-    expect(execSync).toHaveBeenCalledWith('pnpm install', expect.anything());
+    expect(runTask).toHaveBeenCalledWith('pnpm install', expect.anything());
     const manifest = readManifest();
     expect(Object.keys(manifest ?? {})).toEqual(Object.keys(manifest ?? {}).sort());
     expect(
@@ -138,7 +141,7 @@ describe('init manifest', () => {
     expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
     expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
     expect(readFileSync(path.join(dir, 'eslint.config.js'), 'utf8')).toBe('export default [];\n');
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it('rethrows registry cancellation before changing the project', async () => {
@@ -150,14 +153,12 @@ describe('init manifest', () => {
     await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toBe(failure);
     expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
     expect(readFileSync(path.join(dir, 'package.json'), 'utf8')).toBe(before);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(exit).not.toHaveBeenCalled();
   });
 
   it('retains the applied-content manifest after an install failure', async () => {
-    vi.mocked(execSync).mockImplementationOnce(() => {
-      throw new Error('Install failed');
-    });
+    vi.mocked(runTask).mockRejectedValueOnce(new Error('Install failed'));
     const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
     failOnExit();
 
@@ -169,7 +170,46 @@ describe('init manifest', () => {
       hashEntry('.editorconfig', readFileSync(path.join(dir, '.editorconfig'), 'utf8')),
     );
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Run "pnpm install" manually.'));
-    expect(execSync).toHaveBeenCalledTimes(1);
+    expect(runTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('awaits install before Husky and the ready message', async () => {
+    let finish: () => void = () => {};
+    vi.mocked(runTask).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const log = vi.spyOn(process.stdout, 'write');
+    const pending = init({ pm: 'pnpm', targetDir: dir, yes: true });
+    try {
+      await vi.waitFor(() => expect(runTask).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(runTask).toHaveBeenCalledTimes(1);
+      expect(log).not.toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready'));
+    } finally {
+      finish();
+      await pending;
+    }
+    expect(vi.mocked(runTask).mock.calls.map(([command]) => command)).toEqual([
+      'pnpm install',
+      'pnpm exec husky',
+    ]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready'));
+  });
+
+  it('stops after a cancelled install without Husky, exit or success', async () => {
+    const failure = new CommandCancelledError('pnpm install');
+    vi.mocked(runTask).mockRejectedValueOnce(failure);
+    const exit = vi.spyOn(process, 'exit');
+    const log = vi.spyOn(process.stdout, 'write');
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toBe(failure);
+
+    expect(runTask).toHaveBeenCalledTimes(1);
+    expect(exit).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready'));
   });
 
   it('reports manifest write failure without installing or announcing readiness', async () => {
@@ -187,7 +227,7 @@ describe('init manifest', () => {
     expect(stderr).toHaveBeenCalledWith(
       expect.stringContaining('.toolchain.json: permission denied'),
     );
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
     expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready!'));
   });
 
@@ -209,7 +249,7 @@ describe('init manifest', () => {
     expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
     expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
     expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -240,7 +280,7 @@ describe('init manifest', () => {
     expect(existsSync(path.join(dir, 'eslint.config.js'))).toBe(true);
     expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
     expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 });
 
@@ -255,7 +295,7 @@ describe('init package manager', () => {
     const commitMsg = readFileSync(path.join(dir, '.husky', 'commit-msg'), 'utf8');
     expect(preCommit).toBe('pnpm exec lint-staged\npnpm run typecheck\n');
     expect(commitMsg).toBe('pnpm exec commitlint --edit "$1"\n');
-    expect(execSync).toHaveBeenCalledWith('pnpm install', expect.anything());
+    expect(runTask).toHaveBeenCalledWith('pnpm install', expect.anything());
   });
 
   it('falls back to the detected package manager without --pm', async () => {
@@ -265,7 +305,7 @@ describe('init package manager', () => {
 
     const preCommit = readFileSync(path.join(dir, '.husky', 'pre-commit'), 'utf8');
     expect(preCommit).toBe('yarn exec lint-staged\nyarn run typecheck\n');
-    expect(execSync).toHaveBeenCalledWith('yarn install', expect.anything());
+    expect(runTask).toHaveBeenCalledWith('yarn install', expect.anything());
   });
 });
 
@@ -512,7 +552,7 @@ describe('init in an unsupported project', () => {
     expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
     expect(existsSync(path.join(dir, '.oxlintrc.json'))).toBe(false);
     expect(existsSync(path.join(dir, '.husky'))).toBe(false);
-    expect(execSync).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
   });
 });
 
