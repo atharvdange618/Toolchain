@@ -40,7 +40,6 @@
     "test:watch": "vitest",
     "smoke": "bash scripts/smoke.sh",
     "prepublishOnly": "pnpm run build",
-    "commit": "cz",
     "lint:strict": "oxlint . --deny-warnings",
     "prepare": "husky"
   },
@@ -50,21 +49,19 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@types/node": "^22.15.3",
     "@types/prompts": "^2.4.9",
     "@types/semver": "^7.8.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "oxlint": "^1.92.0",
+    "oxlint-tsgolint": "^7.0.2006",
     "prettier": "^3.9.10",
     "semver": "^7.8.5",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11",
-    "@commitlint/cli": "^21.2.4",
-    "@commitlint/config-conventional": "^21.2.4",
-    "@commitlint/cz-commitlint": "^21.2.4",
-    "commitizen": "^4.3.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^17.6.0",
-    "oxlint-tsgolint": "^7.0.2006"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=18"
@@ -82,10 +79,5 @@
       "oxlint --no-error-on-unmatched-pattern",
       "prettier --write"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "@commitlint/cz-commitlint"
-    }
   }
 }

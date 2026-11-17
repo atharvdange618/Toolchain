@@ -77,7 +77,10 @@ export function applyKeyEntries(
         throw new Error(`${entry.path} must be a string`);
       if (value === undefined) delete object[key];
       else object[key] = value;
-      draft[top] = object;
+      // update removes config.commitizen from 2.x projects (#10); leaving
+      // "config": {} behind would be noise in their package.json.
+      if (top === 'config' && Object.keys(object).length === 0) delete draft[top];
+      else draft[top] = object;
     }
   }
   // Validate every selected entry before changing the caller's object.

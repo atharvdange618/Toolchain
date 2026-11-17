@@ -67,7 +67,6 @@ describe('updatePackageJson', () => {
     const pkg = readPkg();
 
     expect(pkg['scripts']).toMatchObject({
-      commit: 'cz',
       lint: 'oxlint .',
       'lint:fix': 'oxlint . --fix',
       'lint:strict': 'oxlint . --deny-warnings',
@@ -172,28 +171,14 @@ describe('updatePackageJson', () => {
     });
   });
 
-  it('wires up commitizen to read prompts from the generated commitlint config', () => {
+  it('adds no commitizen prompt, script or config (#10)', () => {
     writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'my-app' }));
 
     updatePackageJson(dir, BASE_INFO);
     const pkg = readPkg();
 
-    expect(pkg['config']).toEqual({ commitizen: { path: '@commitlint/cz-commitlint' } });
-  });
-
-  it('preserves other config.* keys when adding commitizen', () => {
-    writeFileSync(
-      path.join(dir, 'package.json'),
-      JSON.stringify({ config: { 'some-other-tool': { setting: true } }, name: 'my-app' }),
-    );
-
-    updatePackageJson(dir, BASE_INFO);
-    const pkg = readPkg();
-
-    expect(pkg['config']).toEqual({
-      commitizen: { path: '@commitlint/cz-commitlint' },
-      'some-other-tool': { setting: true },
-    });
+    expect(pkg['scripts']).not.toHaveProperty('commit');
+    expect(pkg).not.toHaveProperty('config');
   });
 
   it('preserves existing scripts that do not conflict', () => {

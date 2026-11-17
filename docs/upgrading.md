@@ -2,6 +2,16 @@
 
 Full notes for every release are in [CHANGELOG.md](../CHANGELOG.md).
 
+## From 2.2
+
+`update` removes the `commit` script and `config.commitizen` if you never changed them. It leaves dependencies alone, so uninstall the prompt yourself:
+
+```bash
+npm uninstall commitizen @commitlint/cz-commitlint
+```
+
+Use your own manager's remove command if you're not on npm. Keep both packages instead if you use the prompt; nothing else depends on them.
+
 ## From 2.1 or 2.0
 
 Adopt the manifest and review changes with:

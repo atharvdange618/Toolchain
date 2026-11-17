@@ -48,6 +48,8 @@ export function assertEntryPath(entryPath: string): void {
 
   if (hash !== -1 && safeContainer) {
     if (file === 'package.json') {
+      // No generator writes config.commitizen since #10, but 2.x manifests
+      // still track it, and update needs to read them to remove it.
       if (selector === 'lint-staged' || selector === 'config.commitizen') return;
       if ((container === 'scripts' || container === 'devDependencies') && safeKey) return;
     }

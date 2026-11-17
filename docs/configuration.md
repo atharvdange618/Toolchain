@@ -16,7 +16,6 @@ What `init` writes, and why each piece looks the way it does.
 | `format`       | `prettier --write .`       |                                                                                                       |
 | `format:check` | `prettier --check .`       |                                                                                                       |
 | `typecheck`    | `tsc --noEmit`             | `tsc -b` when the root tsconfig has project references; Next.js 15.5+ runs `next typegen &&` first    |
-| `commit`       | `cz`                       | Interactive commit prompt                                                                             |
 | `prepare`      | `husky`                    | Reinstalls the hooks                                                                                  |
 
 On Next.js 15.5 and later, `lint`, `lint:fix` and `lint:strict` run `next typegen` first, like `typecheck`. Type-aware oxlint reads `RouteContext` from the files it writes, and on a fresh checkout every `context.params` would otherwise fail as an error-typed value. The pre-commit hook runs `next typegen` before `lint-staged` for the same reason.
@@ -72,13 +71,9 @@ Expo configs also turn `typescript/no-require-imports` off (Metro resolves asset
 
 ## Commit messages
 
-Every generated project gets an interactive commit prompt on top of commitlint's enforcement:
+The `commit-msg` hook runs commitlint with `commitlint.config.mjs`, which extends `@commitlint/config-conventional`. A message like `feat(cli): add doctor` passes; `added doctor` fails the commit with commitlint's reason.
 
-```bash
-pnpm run commit
-```
-
-This runs `cz`, powered by `commitizen` and `@commitlint/cz-commitlint`. It reads the same `commitlint.config.mjs` this tool generates, so the prompt's types and rules always match what the `commit-msg` hook actually enforces. There's no separate config to keep in sync.
+There is no interactive commit prompt. Up to 2.2 the toolchain added one through `commitizen`, but every `commitizen` release pins `glob@7.2.3`, which pulls in the deprecated `inflight` and printed two warnings on every npm install (#10).
 
 ## Unsupported stacks
 
