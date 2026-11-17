@@ -15,7 +15,7 @@ vi.mock('@clack/prompts', async (importOriginal) => ({
 }));
 vi.mock('../utils/versions.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/versions.js')>()),
-  getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0', typescript: '^7.0.2' })),
+  getToolchainDeps: vi.fn().mockResolvedValue({ husky: '^9.0.0', typescript: '^7.0.2' }),
 }));
 
 const { execSync } = await import('node:child_process');

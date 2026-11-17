@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 
 import { hashEntry, parseManifest, serializeManifest } from '../manifest/manifest.js';
 import * as writer from '../manifest/write.js';
+import { CommandCancelledError } from '../utils/process.js';
 import { getToolchainDeps, TOOLCHAIN_DEP_NAMES } from '../utils/versions.js';
 import { doctor } from './doctor.js';
 import { init } from './init.js';
@@ -24,7 +25,7 @@ vi.mock('../utils/versions.js', async (importOriginal) => {
   return {
     ...original,
     getToolchainDeps: vi.fn((names: readonly string[] = original.TOOLCHAIN_DEP_NAMES) =>
-      Object.fromEntries(names.map((name) => [name, '^7.0.2'])),
+      Promise.resolve(Object.fromEntries(names.map((name) => [name, '^7.0.2']))),
     ),
   };
 });
@@ -108,7 +109,7 @@ beforeEach(async () => {
   vi.mocked(getToolchainDeps)
     .mockReset()
     .mockImplementation((names = TOOLCHAIN_DEP_NAMES) =>
-      Object.fromEntries(names.map((name) => [name, '^7.0.2'])),
+      Promise.resolve(Object.fromEntries(names.map((name) => [name, '^7.0.2']))),
     );
   await fresh({ name: 'demo' });
   output.mockClear();
@@ -513,13 +514,67 @@ describe('script-first hooks and root-only scope', () => {
 });
 
 describe('dependency restoration and recovery', () => {
+  it('resolves missing dependencies only after both conflict stages finish', async () => {
+    editPackage((pkg) => {
+      delete (pkg['devDependencies'] as Record<string, string>)['husky'];
+    });
+    conflict('.prettierrc');
+    conflict('.husky/pre-commit');
+    select.mockImplementation(() => {
+      expect(getToolchainDeps).not.toHaveBeenCalled();
+      return Promise.resolve('overwrite');
+    });
+    expect(await run(false)).toBe(0);
+    expect(select).toHaveBeenCalledTimes(2);
+    expect(getToolchainDeps).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for dependency resolution before preparing or applying writes', async () => {
+    editPackage((pkg) => {
+      delete (pkg['devDependencies'] as Record<string, string>)['husky'];
+    });
+    stale();
+    const before = files();
+    const prepare = vi.spyOn(writer, 'prepareWrites');
+    let complete: (versions: Record<string, string>) => void = () => {};
+    vi.mocked(getToolchainDeps).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const pending = run();
+    try {
+      await vi.waitFor(() => expect(getToolchainDeps).toHaveBeenCalled());
+      expect(prepare).not.toHaveBeenCalled();
+      expect(files()).toEqual(before);
+      expect(execSync).not.toHaveBeenCalled();
+    } finally {
+      complete({ husky: '^9.0.0' });
+      expect(await pending).toBe(0);
+    }
+  });
+
+  it('leaves the tree unchanged when registry resolution is cancelled', async () => {
+    editPackage((pkg) => {
+      delete (pkg['devDependencies'] as Record<string, string>)['husky'];
+    });
+    stale();
+    const before = files();
+    vi.mocked(getToolchainDeps).mockRejectedValueOnce(new CommandCancelledError('npm view husky'));
+    expect(await run()).toBe(1);
+    expect(files()).toEqual(before);
+    expect(execSync).not.toHaveBeenCalled();
+    expect(stdout()).not.toContain('Toolchain update complete');
+  });
+
   it('resolves only absent husky, keeps other ranges and installs once with selected manager', async () => {
     editPackage((pkg) => {
       delete (pkg['devDependencies'] as Record<string, string>)['husky'];
     });
     const before = json('package.json')['devDependencies'] as Record<string, string>;
     expect(await run(true, 'yarn')).toBe(0);
-    expect(getToolchainDeps).toHaveBeenCalledExactlyOnceWith(['husky']);
+    expect(getToolchainDeps).toHaveBeenCalledExactlyOnceWith(['husky'], expect.any(AbortSignal));
     expect(json('package.json')['devDependencies']).toEqual({ ...before, husky: '^7.0.2' });
     expect(execSync).toHaveBeenCalledExactlyOnceWith('yarn install', {
       cwd: dir,
@@ -538,7 +593,10 @@ describe('dependency restoration and recovery', () => {
       delete (pkg['devDependencies'] as Record<string, string>)['typescript'];
     });
     expect(await run()).toBe(0);
-    expect(getToolchainDeps).toHaveBeenCalledExactlyOnceWith(['typescript']);
+    expect(getToolchainDeps).toHaveBeenCalledExactlyOnceWith(
+      ['typescript'],
+      expect.any(AbortSignal),
+    );
     expect((json('package.json')['devDependencies'] as Record<string, string>)['typescript']).toBe(
       '^7.0.2',
     );
@@ -587,7 +645,7 @@ describe('dependency restoration and recovery', () => {
     const manifest = read('.toolchain.json');
     vi.mocked(getToolchainDeps).mockImplementationOnce(() => {
       put('.prettierignore', 'changed externally\n');
-      return { husky: '^9.1.7' };
+      return Promise.resolve({ husky: '^9.1.7' });
     });
     expect(await run()).toBe(1);
     expect(read('package.json')).toBe(pkg);

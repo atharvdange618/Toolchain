@@ -157,13 +157,23 @@ Each item has an owning test task below:
 
 **Interfaces:** `getToolchainDeps(names?): Promise<Record<string, string>>`; `getVersions(names): Promise<Record<string, string>>`; registry-backed single-version helpers return `Promise<string>`. `getTypescriptVersion(): string` and `pickSettledVersion(...)` stay synchronous. `buildPlan(targetDir, info, pm, deps, pkg?)` stays synchronous and requires explicit resolved dependencies.
 
-- [ ] Convert registry tests to awaited results/rejections. Cover malformed/missing metadata, failed npm command, stable-age choice, cached success, uncached failure/retry, selective names and TypeScript-only resolution with zero spawned commands.
-- [ ] Replace the generator test that expects a registry failure inside `buildPlan`: assert offline planning with injected deps instead. Keep lookup-failure/no-writes coverage in init, where resolution now belongs.
-- [ ] Run the focused tests and observe failures.
-- [ ] Use `runCommand(..., { mode: 'capture', ... })` for npm metadata. Validate parsed JSON with existing `isObject` and explicit field checks. Resolve the requested names concurrently and keep the current cache (cache the in-flight promise only after success, so a failure is retried). Do not add duplicate sync/async lookup APIs.
-- [ ] In init, await all toolchain versions after consent and before `buildPlan` or any writes. In update, await only missing required versions after both choice stages, before `prepareWrites`. Give these waits one progress display via `withProgress`.
-- [ ] Update all `buildPlan` callers to pass dependencies. `manifest/project.ts` must continue passing its offline placeholders. Unit tests for `planPackageJson` should inject fixtures directly instead of invoking a network helper just to build fixture data.
-- [ ] Run `pnpm exec vitest run src/utils/versions.test.ts src/generators/plan.test.ts src/generators/package-json.test.ts src/commands/init.test.ts src/commands/update.test.ts src/commands/doctor.test.ts src/manifest/project.test.ts` and `pnpm run typecheck`.
+- [x] Convert registry tests to awaited results/rejections. Cover malformed/missing metadata, failed npm command, stable-age choice, cached success, uncached failure/retry, selective names and TypeScript-only resolution with zero spawned commands.
+- [x] Replace the generator test that expects a registry failure inside `buildPlan`: assert offline planning with injected deps instead. Keep lookup-failure/no-writes coverage in init, where resolution now belongs.
+- [x] Run the focused tests and observe failures.
+- [x] Use `runCommand(..., { mode: 'capture', ... })` for npm metadata. Validate parsed JSON with existing `isObject` and explicit field checks. Resolve the requested names concurrently and keep the current cache (cache the in-flight promise only after success, so a failure is retried). Do not add duplicate sync/async lookup APIs.
+- [x] In init, await all toolchain versions after consent and before `buildPlan` or any writes. In update, await only missing required versions after both choice stages, before `prepareWrites`. Give these waits one progress display via `withProgress`.
+- [x] Update all `buildPlan` callers to pass dependencies. `manifest/project.ts` must continue passing its offline placeholders. Unit tests for `planPackageJson` should inject fixtures directly instead of invoking a network helper just to build fixture data.
+- [x] Run `pnpm exec vitest run src/utils/versions.test.ts src/generators/plan.test.ts src/generators/package-json.test.ts src/commands/init.test.ts src/commands/update.test.ts src/commands/doctor.test.ts src/manifest/project.test.ts` and `pnpm run typecheck`.
+
+### Task 3 execution notes, 2026-11-17
+
+- Registry calls now await `runCommand` capture output, validate metadata from `unknown`, and run concurrently through `getVersions`. Failed batches abort and await their remaining children; failures and cancellation are not cached. TypeScript stays synchronous and offline.
+- Init resolves versions after consent; update resolves only missing requirements after both choice stages. Both use one `withProgress` display and pass its abort signal through the lookup batch. Deferred tests verify that neither command writes before resolution.
+- `buildPlan` requires supplied dependency ranges and performs no registry access. Doctor and manifest planning retain their offline placeholders; package-json tests inject fixtures directly.
+- Ruling: moved the registry-backed template factory awaits and scaffold's generator await from Task 5 into Task 3. Async version helpers would otherwise put promises into generated package data. Monorepo generation resolves Node types once and supplies the range to its synchronous file helper. External scaffolders, Git, install, Husky, lint and format subprocess migration remains in Tasks 4�5.
+- Focused verification passed: the seven files listed above passed 245 tests; including template tests passed 253. Full verification passed lint, typecheck, formatting, build, and 664 tests with 4 skips. The Windows sandbox first blocked the existing process-tree cancellation tests (`stops the whole process tree when aborted`, `lets work pass cancellation to the real subprocess runner`, and `aborts the child, retains its log, and never prints success`), leaving locked test directories. The full suite passed outside that sandbox without changes to those tests.
+- A read-only live lookup of husky and Prettier resolved both ranges in 1.66 seconds. The built doctor passed in text and JSON modes: 65 in sync, one existing local edit, no action needed, exit 0.
+- Changes remain uncommitted; PR #12's green CI run covers the earlier Tasks 1�2 snapshot. Task 3 still needs a commit and push before CI can check it.
 
 ## Task 4: Init and update task execution and recovery
 
@@ -183,7 +193,7 @@ Each item has an owning test task below:
 **Interfaces:** `TemplateResult.scaffold?: (ctx: TemplateContext) => Promise<void>`; generator registry accepts `TemplateResult | Promise<TemplateResult>` and scaffold awaits it. Do not force pure `generatePlain`, `generateReact` or `generateNextjs` factories to become async just to match the registry.
 
 - [ ] Add failing tests that a delayed external scaffolder finishes before Git/init/format, and that scaffolder cancellation/error prevents every subsequent phase and final success.
-- [ ] Make registry-backed Express/pnpm-monorepo/Turbo generators async. Resolve the Node types version once per monorepo generation, then pass it into synchronous `generateMonorepoPackageFiles(devScript, typesNodeVersion)` and its package-json helper. Keep generated strings unchanged.
+- [x] Make registry-backed Express/pnpm-monorepo/Turbo generators async. Resolve the Node types version once per monorepo generation, then pass it into synchronous `generateMonorepoPackageFiles(devScript, typesNodeVersion)` and its package-json helper. Keep generated strings unchanged.
 - [ ] Await external React/Next scaffolder callbacks. Apply the React flags specified above; update the existing test which currently expects prompts without outer `--yes`. Preserve Next.js `--yes`/TypeScript/App Router choices and interactive behavior.
 - [ ] Await Git initialization and cleanup commands through the task helper. Retain the existing warning-and-continue behavior for ordinary Git/lint/format failures. Treat cancellation separately so it stops the command; never print "ready" after cancellation.
 - [ ] Update template tests and version mocks to promises where required. Keep the existing real TypeScript compile check; synchronous subprocesses used only in tests do not need migration.

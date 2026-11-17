@@ -1,8 +1,9 @@
-import { execSync } from 'node:child_process';
+import { isObject } from './fs.js';
+import { CommandCancelledError, isCommandCancelled, runCommand } from './process.js';
 
 const VERSION_CACHE = new Map<string, string>();
 
-export function getExpressVersion(): string {
+export function getExpressVersion(): Promise<string> {
   return toRange('express');
 }
 
@@ -19,19 +20,23 @@ export const TOOLCHAIN_DEP_NAMES: readonly string[] = [
   'typescript',
 ];
 
-export function getToolchainDeps(
+export async function getToolchainDeps(
   names: readonly string[] = TOOLCHAIN_DEP_NAMES,
-): Record<string, string> {
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
   for (const name of names) {
     if (!TOOLCHAIN_DEP_NAMES.includes(name))
       throw new Error(`Unknown toolchain dependency: ${name}`);
   }
-  return Object.fromEntries(
-    names.map((name) => [name, name === 'typescript' ? getTypescriptVersion() : toRange(name)]),
+  const versions = await getVersions(
+    names.filter((name) => name !== 'typescript'),
+    signal,
   );
+  if (names.includes('typescript')) versions['typescript'] = getTypescriptVersion();
+  return versions;
 }
 
-export function getTurboVersion(): string {
+export function getTurboVersion(): Promise<string> {
   return toRange('turbo');
 }
 
@@ -40,20 +45,29 @@ export function getTypescriptVersion(): string {
   return '^7.0.2';
 }
 
-export function getTypesExpressVersion(): string {
+export function getTypesExpressVersion(): Promise<string> {
   return toRange('@types/express');
 }
 
-export function getTypesNodeVersion(): string {
+export function getTypesNodeVersion(): Promise<string> {
   return toRange('@types/node');
 }
 
-export function getVersions(packages: string[]): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const pkg of packages) {
-    result[pkg] = toRange(pkg);
+export async function getVersions(
+  packages: readonly string[],
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  if (signal?.aborted) throw new CommandCancelledError('Resolve dependency versions');
+  const controller = new AbortController();
+  const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  const lookups = packages.map(async (pkg) => [pkg, await toRange(pkg, combined)] as const);
+  try {
+    return Object.fromEntries(await Promise.all(lookups));
+  } catch (failure) {
+    controller.abort();
+    await Promise.allSettled(lookups);
+    throw failure;
   }
-  return result;
 }
 
 // pnpm 11 holds back anything published less than a day ago
@@ -92,34 +106,40 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-function getLatestVersion(pkg: string): string | undefined {
-  if (VERSION_CACHE.has(pkg)) return VERSION_CACHE.get(pkg);
+async function toRange(pkg: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new CommandCancelledError(`npm view ${pkg}`);
+  const cached = VERSION_CACHE.get(pkg);
+  if (cached !== undefined) return `^${cached}`;
   try {
-    const view = JSON.parse(
-      execSync(`npm view ${pkg} time dist-tags --json`, { encoding: 'utf8' }),
-    ) as { 'dist-tags': { latest: string }; time: Record<string, string> };
-    const version = pickSettledVersion(
-      view.time,
-      view['dist-tags'].latest,
-      Date.now() - MIN_RELEASE_AGE_MS,
-    );
+    const { stdout } = await runCommand(`npm view ${pkg} time dist-tags --json`, {
+      cwd: process.cwd(),
+      mode: 'capture',
+      ...(signal ? { signal } : {}),
+    });
+    const view: unknown = JSON.parse(stdout);
+    if (!isObject(view) || !isObject(view['dist-tags']) || !isObject(view['time'])) {
+      throw new Error('Invalid npm metadata');
+    }
+    const latest = view['dist-tags']['latest'];
+    if (typeof latest !== 'string' || !/^\d+\.\d+\.\d+$/.test(latest)) {
+      throw new Error('Invalid npm latest version');
+    }
+    const time: Record<string, string> = {};
+    for (const [version, published] of Object.entries(view['time'])) {
+      if (typeof published !== 'string' || !Number.isFinite(Date.parse(published))) {
+        throw new Error('Invalid npm publication date');
+      }
+      time[version] = published;
+    }
+    if (time[latest] === undefined) throw new Error('Missing npm publication date');
+    const version = pickSettledVersion(time, latest, Date.now() - MIN_RELEASE_AGE_MS);
     VERSION_CACHE.set(pkg, version);
-    return version;
-  } catch {
-    return undefined;
-  }
-}
-
-// Resolves a package to a caret range. A failed lookup throws rather than
-// degrading to an unconstrained "*" (or worse, the invalid range "^*") -
-// the caller aborts the whole init/scaffold run instead of writing a
-// looser dependency range than the rest of the toolchain promises.
-function toRange(pkg: string): string {
-  const version = getLatestVersion(pkg);
-  if (version === undefined) {
+    return `^${version}`;
+  } catch (failure) {
+    if (isCommandCancelled(failure)) throw failure;
     throw new Error(
       `Could not resolve the latest version of "${pkg}" from npm. Check your network connection and try again.`,
+      { cause: failure },
     );
   }
-  return `^${version}`;
 }

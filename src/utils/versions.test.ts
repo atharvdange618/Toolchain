@@ -2,11 +2,18 @@ import semver from 'semver';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
+  execSync: vi.fn(() => {
+    throw new Error('Synchronous registry access');
+  }),
 }));
 
-const { execSync } = await import('node:child_process');
-const mockedExecSync = vi.mocked(execSync);
+vi.mock('./process.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./process.js')>()),
+  runCommand: vi.fn(),
+}));
+
+const { runCommand, CommandCancelledError } = await import('./process.js');
+const mockedRunCommand = vi.mocked(runCommand);
 
 // versions.ts caches results in a module-level Map, so each test uses a
 // unique fake package name to avoid bleeding state across tests.
@@ -25,7 +32,7 @@ function npmView(latest: string): string {
 }
 
 beforeEach(() => {
-  mockedExecSync.mockReset();
+  mockedRunCommand.mockReset();
   // getToolchainDeps always queries the same real package names, so without
   // a fresh module instance per test their results would be cached by
   // whichever test runs first, hiding the failure path later.
@@ -33,41 +40,128 @@ beforeEach(() => {
 });
 
 describe('getVersions', () => {
+  it.each([
+    'invalid JSON',
+    'null',
+    '[]',
+    '{}',
+    '{"dist-tags":{"latest":"*"},"time":{}}',
+    '{"dist-tags":{"latest":"1.0.0"},"time":[]}',
+    '{"dist-tags":{"latest":"1.0.0"},"time":{"1.0.0":7}}',
+    '{"dist-tags":{"latest":"1.0.0"},"time":{"1.0.0":"bad date"}}',
+  ])('rejects malformed registry metadata: %s', async (stdout) => {
+    const { getVersions } = await import('./versions.js');
+    mockedRunCommand.mockResolvedValue({ stdout });
+    await expect(getVersions(['husky'])).rejects.toThrow('Could not resolve');
+  });
+
+  it('starts all lookups before awaiting any result and retries a failed lookup', async () => {
+    const { getVersions } = await import('./versions.js');
+    let resolveFirst: (value: { stdout: string }) => void = () => {};
+    let resolveSecond: (value: { stdout: string }) => void = () => {};
+    const first = new Promise<{ stdout: string }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<{ stdout: string }>((resolve) => {
+      resolveSecond = resolve;
+    });
+    mockedRunCommand.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const result = getVersions(['one', 'two']);
+    expect(mockedRunCommand).toHaveBeenCalledTimes(2);
+    resolveFirst({ stdout: npmView('1.0.0') });
+    resolveSecond({ stdout: npmView('2.0.0') });
+    await expect(result).resolves.toEqual({ one: '^1.0.0', two: '^2.0.0' });
+    mockedRunCommand.mockRejectedValueOnce(new Error('offline'));
+    await expect(getVersions(['retry'])).rejects.toThrow('retry');
+    mockedRunCommand.mockResolvedValueOnce({ stdout: npmView('3.0.0') });
+    await expect(getVersions(['retry'])).resolves.toEqual({ retry: '^3.0.0' });
+  });
+
+  it('preserves cancellation and does not cache it', async () => {
+    const { getVersions } = await import('./versions.js');
+    const cancelled = new CommandCancelledError('npm view husky');
+    mockedRunCommand.mockRejectedValueOnce(cancelled);
+    await expect(getVersions(['husky'])).rejects.toBe(cancelled);
+    mockedRunCommand.mockResolvedValueOnce({ stdout: npmView('1.0.0') });
+    await expect(getVersions(['husky'])).resolves.toEqual({ husky: '^1.0.0' });
+  });
+
+  it('aborts and waits for sibling lookups when a batch fails', async () => {
+    const { getVersions } = await import('./versions.js');
+    let stopped = false;
+    mockedRunCommand.mockRejectedValueOnce(new Error('offline')).mockImplementationOnce(
+      (_command, { signal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            stopped = true;
+            reject(new CommandCancelledError('sibling'));
+          });
+        }),
+    );
+    await expect(getVersions(['one', 'two'])).rejects.toThrow('one');
+    expect(stopped).toBe(true);
+  });
+
+  it('passes a caller abort signal to every lookup', async () => {
+    const { getToolchainDeps } = await import('./versions.js');
+    const controller = new AbortController();
+    mockedRunCommand.mockImplementation(
+      (_command, { signal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new CommandCancelledError('lookup')));
+        }),
+    );
+    const result = getToolchainDeps(['husky', 'prettier'], controller.signal);
+    controller.abort();
+    await expect(result).rejects.toBeInstanceOf(CommandCancelledError);
+  });
+
+  it('applies the stable-release age policy to npm metadata', async () => {
+    const { getVersions } = await import('./versions.js');
+    mockedRunCommand.mockResolvedValue({
+      stdout: JSON.stringify({
+        'dist-tags': { latest: '2.0.0' },
+        time: { '1.0.0': LONG_AGO, '2.0.0': new Date().toISOString() },
+      }),
+    });
+    await expect(getVersions(['husky'])).resolves.toEqual({ husky: '^1.0.0' });
+  });
   it('resolves each package to a caret-prefixed version', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
-    mockedExecSync.mockReturnValue(npmView('2.5.0'));
+    mockedRunCommand.mockResolvedValue({ stdout: npmView('2.5.0') });
 
-    const result = getVersions([pkg]);
+    const result = await getVersions([pkg]);
 
     expect(result).toEqual({ [pkg]: '^2.5.0' });
-    expect(mockedExecSync).toHaveBeenCalledWith(`npm view ${pkg} time dist-tags --json`, {
-      encoding: 'utf8',
-    });
+    const [command, options] = mockedRunCommand.mock.calls[0] ?? [];
+    expect(command).toBe(`npm view ${pkg} time dist-tags --json`);
+    expect(options).toMatchObject({ cwd: process.cwd(), mode: 'capture' });
+    expect(options?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('throws instead of degrading to an unconstrained or invalid range when the npm lookup fails', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
-    mockedExecSync.mockImplementation(() => {
+    mockedRunCommand.mockImplementation(() => {
       throw new Error('network error');
     });
 
     // A failed lookup aborts the whole init/scaffold run rather than
     // silently writing a looser dependency range (or the invalid range
     // "^*" a naive `^${fallback}` wrap used to produce).
-    expect(() => getVersions([pkg])).toThrow(pkg);
+    await expect(getVersions([pkg])).rejects.toThrow(pkg);
   });
 
   it('caches a resolved version instead of calling npm view again', async () => {
     const { getVersions } = await import('./versions.js');
     const pkg = uniquePkg();
-    mockedExecSync.mockReturnValue(npmView('1.0.0'));
+    mockedRunCommand.mockResolvedValue({ stdout: npmView('1.0.0') });
 
-    getVersions([pkg]);
-    getVersions([pkg]);
+    await getVersions([pkg]);
+    await getVersions([pkg]);
 
-    expect(mockedExecSync).toHaveBeenCalledTimes(1);
+    expect(mockedRunCommand).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -121,34 +215,41 @@ describe('getTypescriptVersion', () => {
 
     expect(semver.satisfies('7.4.0', range)).toBe(true);
     expect(semver.satisfies('6.0.3', range)).toBe(false);
-    expect(mockedExecSync).not.toHaveBeenCalled();
+    expect(mockedRunCommand).not.toHaveBeenCalled();
   });
 });
 
 describe('getToolchainDeps', () => {
+  it('resolves TypeScript alone without spawning npm', async () => {
+    const { getToolchainDeps } = await import('./versions.js');
+    await expect(getToolchainDeps(['typescript'])).resolves.toEqual({ typescript: '^7.0.2' });
+    expect(mockedRunCommand).not.toHaveBeenCalled();
+  });
   it('resolves only selected required names, keeping TypeScript offline', async () => {
     const { getToolchainDeps } = await import('./versions.js');
-    mockedExecSync.mockReturnValue(npmView('9.9.9'));
-    expect(getToolchainDeps(['husky', 'typescript'])).toEqual({
+    mockedRunCommand.mockResolvedValue({ stdout: npmView('9.9.9') });
+    expect(await getToolchainDeps(['husky', 'typescript'])).toEqual({
       husky: '^9.9.9',
       typescript: '^7.0.2',
     });
-    expect(mockedExecSync.mock.calls).toEqual([
-      ['npm view husky time dist-tags --json', { encoding: 'utf8' }],
+    expect(mockedRunCommand.mock.calls.map(([command]) => command)).toEqual([
+      'npm view husky time dist-tags --json',
     ]);
   });
 
   it('rejects unknown names before doing any lookups', async () => {
     const { getToolchainDeps } = await import('./versions.js');
-    expect(() => getToolchainDeps(['husky', 'not-a-toolchain-dep'])).toThrow('not-a-toolchain-dep');
-    expect(mockedExecSync).not.toHaveBeenCalled();
-    expect(getToolchainDeps([])).toEqual({});
+    await expect(getToolchainDeps(['husky', 'not-a-toolchain-dep'])).rejects.toThrow(
+      'not-a-toolchain-dep',
+    );
+    expect(mockedRunCommand).not.toHaveBeenCalled();
+    expect(await getToolchainDeps([])).toEqual({});
   });
   it('returns caret versions for the toolchain packages', async () => {
     const { getToolchainDeps } = await import('./versions.js');
-    mockedExecSync.mockReturnValue(npmView('9.9.9'));
+    mockedRunCommand.mockResolvedValue({ stdout: npmView('9.9.9') });
 
-    const deps = getToolchainDeps();
+    const deps = await getToolchainDeps();
 
     expect(Object.keys(deps)).toEqual(
       expect.arrayContaining([
@@ -174,10 +275,10 @@ describe('getToolchainDeps', () => {
 
   it('throws on the first package that fails to resolve', async () => {
     const { getToolchainDeps } = await import('./versions.js');
-    mockedExecSync.mockImplementation(() => {
+    mockedRunCommand.mockImplementation(() => {
       throw new Error('network error');
     });
 
-    expect(() => getToolchainDeps()).toThrow();
+    await expect(getToolchainDeps()).rejects.toThrow();
   });
 });

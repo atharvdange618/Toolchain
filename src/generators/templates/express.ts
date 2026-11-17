@@ -1,11 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
 
-import {
-  getExpressVersion,
-  getTypescriptVersion,
-  getTypesExpressVersion,
-  getTypesNodeVersion,
-} from '../../utils/versions.js';
+import { getTypescriptVersion, getVersions } from '../../utils/versions.js';
 import { generateTsconfig } from '../tsconfig.js';
 
 const GITIGNORE = `node_modules/
@@ -35,11 +30,9 @@ app.listen(port, () => {
 });
 `;
 
-export function generateExpress(ctx: TemplateContext): TemplateResult {
+export async function generateExpress(ctx: TemplateContext): Promise<TemplateResult> {
   const tsVersion = getTypescriptVersion();
-  const expressVersion = getExpressVersion();
-  const typesExpressVersion = getTypesExpressVersion();
-  const typesNodeVersion = getTypesNodeVersion();
+  const versions = await getVersions(['express', '@types/express', '@types/node']);
 
   return {
     files: [
@@ -52,11 +45,11 @@ export function generateExpress(ctx: TemplateContext): TemplateResult {
     isMonorepo: false,
     packageJson: {
       dependencies: {
-        express: expressVersion,
+        express: versions['express'],
       },
       devDependencies: {
-        '@types/express': typesExpressVersion,
-        '@types/node': typesNodeVersion,
+        '@types/express': versions['@types/express'],
+        '@types/node': versions['@types/node'],
         typescript: tsVersion,
       },
       main: 'dist/index.js',

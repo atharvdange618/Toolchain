@@ -7,11 +7,12 @@ import * as detection from '../detectors/project.js';
 import * as entries from '../generators/entry.js';
 import { hashEntry, parseManifest } from '../manifest/manifest.js';
 import * as manifestWriter from '../manifest/write.js';
+import { CommandCancelledError } from '../utils/process.js';
 
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
 vi.mock('../utils/versions.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/versions.js')>()),
-  getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0', typescript: '^7.0.2' })),
+  getToolchainDeps: vi.fn().mockResolvedValue({ husky: '^9.0.0', typescript: '^7.0.2' }),
 }));
 
 const { execSync } = await import('node:child_process');
@@ -34,6 +35,27 @@ afterEach(() => {
 });
 
 describe('init manifest', () => {
+  it('awaits dependency resolution before moving configs or writing files', async () => {
+    writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
+    let complete: (value: Record<string, string>) => void = () => {};
+    vi.mocked(getToolchainDeps).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const pending = init({ pm: 'pnpm', targetDir: dir, yes: true });
+    try {
+      await vi.waitFor(() => expect(getToolchainDeps).toHaveBeenCalled());
+      expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+      expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
+      expect(execSync).not.toHaveBeenCalled();
+    } finally {
+      complete({ husky: '^9.0.0', typescript: '^7.0.2' });
+      await pending;
+    }
+  });
+
   function readManifest(): Record<string, string> | undefined {
     return parseManifest(readFileSync(path.join(dir, '.toolchain.json'), 'utf8'))?.entries;
   }
@@ -103,9 +125,7 @@ describe('init manifest', () => {
 
   it('leaves configs and manifest unwritten when dependency lookup fails', async () => {
     writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
-    vi.mocked(getToolchainDeps).mockImplementationOnce(() => {
-      throw new Error('Registry unavailable');
-    });
+    vi.mocked(getToolchainDeps).mockRejectedValueOnce(new Error('Registry unavailable'));
     const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
     failOnExit();
 
@@ -119,6 +139,19 @@ describe('init manifest', () => {
     expect(existsSync(path.join(dir, 'eslint.config.js.bak'))).toBe(false);
     expect(readFileSync(path.join(dir, 'eslint.config.js'), 'utf8')).toBe('export default [];\n');
     expect(execSync).not.toHaveBeenCalled();
+  });
+
+  it('rethrows registry cancellation before changing the project', async () => {
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const failure = new CommandCancelledError('npm view husky');
+    vi.mocked(getToolchainDeps).mockRejectedValueOnce(failure);
+    const before = readFileSync(path.join(dir, 'package.json'), 'utf8');
+    const exit = vi.spyOn(process, 'exit');
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toBe(failure);
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(readFileSync(path.join(dir, 'package.json'), 'utf8')).toBe(before);
+    expect(execSync).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
   });
 
   it('retains the applied-content manifest after an install failure', async () => {

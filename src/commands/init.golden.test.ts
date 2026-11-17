@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
 vi.mock('../utils/versions.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../utils/versions.js')>()),
-  getToolchainDeps: vi.fn(() => ({ husky: '^9.0.0', oxlint: '^1.0.0', typescript: '^7.0.2' })),
+  getToolchainDeps: vi
+    .fn()
+    .mockResolvedValue({ husky: '^9.0.0', oxlint: '^1.0.0', typescript: '^7.0.2' }),
 }));
 
 const { init } = await import('./init.js');

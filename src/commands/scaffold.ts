@@ -8,6 +8,7 @@ import { generateExpress } from '../generators/templates/express.js';
 import {
   TEMPLATE_DESCRIPTIONS,
   type TemplateContext,
+  type TemplateResult,
   TEMPLATES,
   type TemplateType,
 } from '../generators/templates/index.js';
@@ -20,15 +21,17 @@ import { writeFile } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
 import { init } from './init.js';
 
-const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<typeof generatePlain>> =
-  {
-    express: generateExpress,
-    nextjs: generateNextjs,
-    plain: generatePlain,
-    'pnpm-monorepo': generatePnpmMonorepo,
-    react: generateReact,
-    turbo: generateTurbo,
-  };
+const GENERATORS: Record<
+  TemplateType,
+  (ctx: TemplateContext) => TemplateResult | Promise<TemplateResult>
+> = {
+  express: generateExpress,
+  nextjs: generateNextjs,
+  plain: generatePlain,
+  'pnpm-monorepo': generatePnpmMonorepo,
+  react: generateReact,
+  turbo: generateTurbo,
+};
 
 const NEXT_COMMAND: Record<TemplateType, string> = {
   express: 'start',
@@ -129,9 +132,9 @@ export async function scaffold(
   };
 
   const generator = GENERATORS[template];
-  let result: ReturnType<typeof generator>;
+  let result: TemplateResult;
   try {
-    result = generator(ctx);
+    result = await generator(ctx);
   } catch (error_) {
     error(
       error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`,

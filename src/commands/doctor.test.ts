@@ -12,7 +12,9 @@ vi.mock('../utils/versions.js', async (importOriginal) => {
   return {
     ...original,
     getToolchainDeps: vi.fn(() =>
-      Object.fromEntries(original.TOOLCHAIN_DEP_NAMES.map((name) => [name, '^7.0.2'])),
+      Promise.resolve(
+        Object.fromEntries(original.TOOLCHAIN_DEP_NAMES.map((name) => [name, '^7.0.2'])),
+      ),
     ),
   };
 });

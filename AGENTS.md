@@ -60,7 +60,7 @@ Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--
 
 ### `src/commands/init.ts`
 
-Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; `buildPlan` resolves dependency versions before anything is written, so a failed lookup leaves the project untouched.
+Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, await dependency versions with progress, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; init finishes version lookups before planning or writing, so a failed or cancelled lookup leaves the project untouched.
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.
@@ -117,7 +117,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/plan.ts`
 
-`buildPlan(targetDir, info, pm, deps?, pkg?)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once unless supplied and writes nothing. Doctor/update supply dependency placeholders and the validated package snapshot to avoid a registry lookup.
+`buildPlan(targetDir, info, pm, deps, pkg?)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once unless supplied and writes nothing. Dependencies are required: init supplies resolved versions; doctor/update supply offline placeholders and the validated package snapshot. Planning performs no registry lookup.
 
 ### `src/generators/oxlint.ts`
 
@@ -154,7 +154,7 @@ Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches t
 
 ### `src/utils/versions.ts`
 
-Asks npm for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. TypeScript is fixed at `^7.0.2`. `TOOLCHAIN_DEP_NAMES` supports offline planning; `getToolchainDeps(names?)` resolves only the selected missing packages for update, or all packages for init.
+Asks npm asynchronously for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. Registry metadata is validated before use, and only successful results are cached. `getVersions(names, signal?)` runs lookups concurrently through `runCommand` in capture mode; a failed batch aborts and awaits its remaining children before rejecting. Cancellation stays typed rather than becoming a network error. TypeScript remains synchronous and fixed at `^7.0.2`. `TOOLCHAIN_DEP_NAMES` supports offline planning; `getToolchainDeps(names?, signal?)` resolves only the selected missing packages for update, or all packages for init. Express and monorepo template factories await their registry versions; shared monorepo file generation stays synchronous with one supplied Node types range.
 
 ## Key Design Decisions
 

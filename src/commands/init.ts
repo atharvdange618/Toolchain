@@ -20,6 +20,9 @@ import { trackedEntries, validatePackageJson } from '../manifest/project.js';
 import { writeManifest } from '../manifest/write.js';
 import { readJson } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
+import { isCommandCancelled } from '../utils/process.js';
+import { withProgress } from '../utils/progress.js';
+import { getToolchainDeps } from '../utils/versions.js';
 
 // v2 lints with oxlint, so an ESLint config left in the project does nothing.
 // Renaming instead of deleting keeps any custom rules the user wrote. The
@@ -135,8 +138,12 @@ export async function init(options: {
   // project as it was.
   let plan: Plan;
   try {
-    plan = buildPlan(targetDir, projectInfo, pm);
+    const deps = await withProgress('Resolving toolchain versions', (signal) =>
+      getToolchainDeps(undefined, signal),
+    );
+    plan = buildPlan(targetDir, projectInfo, pm, deps);
   } catch (error_) {
+    if (isCommandCancelled(error_)) throw error_;
     error(
       error_ instanceof Error ? error_.message : 'Failed to resolve toolchain dependency versions.',
     );

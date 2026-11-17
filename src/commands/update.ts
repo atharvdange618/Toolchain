@@ -14,6 +14,7 @@ import {
   writeManifest,
 } from '../manifest/write.js';
 import { error, info, intro, outro, warn } from '../utils/logger.js';
+import { withProgress } from '../utils/progress.js';
 import { getToolchainDeps } from '../utils/versions.js';
 import { warnAboutWorkspacePackages, warnAboutWorkspaceTypes } from './init.js';
 import { chooseConflicts } from './update-prompts.js';
@@ -79,7 +80,12 @@ export async function update(options: {
     const missing = entries
       .filter((entry) => entry.path.startsWith(dependencyPrefix))
       .map((entry) => entry.path.slice(dependencyPrefix.length));
-    const versions = missing.length > 0 ? getToolchainDeps(missing) : {};
+    const versions =
+      missing.length > 0
+        ? await withProgress('Resolving missing dependency versions', (signal) =>
+            getToolchainDeps(missing, signal),
+          )
+        : {};
     for (const entry of entries) {
       if (!entry.path.startsWith(dependencyPrefix)) continue;
       const name = entry.path.slice(dependencyPrefix.length);
