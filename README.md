@@ -7,6 +7,10 @@
 [![Node](https://img.shields.io/node/v/@atharvdange/toolchain?logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
+![init running in a fresh Next.js app, then git status and a passing lint](https://raw.githubusercontent.com/atharvdange618/toolchain/main/docs/demo.gif)
+
+<sub>`init --yes` in a fresh `create-next-app` project. Waits for the registry and the install are trimmed; [docs/demo.tape](docs/demo.tape) records it.</sub>
+
 One command sets up oxlint, Prettier, Husky, commitlint and strict TypeScript 7 in a Next.js, React, Expo, Express or plain TS project.
 
 ```bash
