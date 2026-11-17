@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 
 import { effectiveScripts, type Entry } from '../generators/entry.js';
 import { withHookWants } from '../generators/husky.js';
+import { assertPattern, type ChoiceFlags, updateCommand } from '../manifest/choices.js';
 import { decide, type Decision, nextManifest } from '../manifest/decide.js';
 import { isHookPath } from '../manifest/manifest.js';
 import { compareProject, loadProject, trackedEntries } from '../manifest/project.js';
@@ -30,8 +31,12 @@ export async function update(options: {
   pm?: string;
   targetDir?: string;
   yes?: boolean;
+  keep?: string[];
+  overwrite?: string[];
 }): Promise<number> {
   try {
+    const flags: ChoiceFlags = { keep: options.keep ?? [], overwrite: options.overwrite ?? [] };
+    for (const pattern of [...flags.keep, ...flags.overwrite]) assertPattern(pattern);
     const project = loadProject(options.targetDir ?? process.cwd(), options.pm);
     assertSafeTargets(
       project.targetDir,
@@ -40,11 +45,20 @@ export async function update(options: {
         ...Object.keys(project.manifest ?? {}),
       ].map((entryPath) => entryPath.split('#')[0] ?? entryPath),
     );
-    const promptOptions = { yes: options.yes ?? false, isTTY: process.stdin.isTTY === true };
+    const promptOptions = {
+      yes: options.yes ?? false,
+      isTTY: process.stdin.isTTY === true,
+      pm: project.pm,
+      flags,
+      used: new Set<string>(),
+    };
     const rows = compareProject(project, trackedEntries(project.plan)).filter(
       (row) => !isHookPath(row.path),
     );
-    const decisions = decide(rows, await chooseConflicts(rows, promptOptions));
+    const decisions = decide(
+      rows,
+      await chooseConflicts(rows, { ...promptOptions, include: (p) => !isHookPath(p) }),
+    );
 
     // Hook wants follow the scripts we will keep or write, with the same original base and disk.
     const scripts = effectiveScripts(selectedEntries(decisions), project.pkg['scripts']);
@@ -52,7 +66,12 @@ export async function update(options: {
       isHookPath(entry.path),
     );
     const hookRows = compareProject(project, hookEntries).filter((row) => isHookPath(row.path));
-    decisions.push(...decide(hookRows, await chooseConflicts(hookRows, promptOptions)));
+    decisions.push(
+      ...decide(
+        hookRows,
+        await chooseConflicts(hookRows, { ...promptOptions, include: isHookPath }),
+      ),
+    );
 
     const entries = selectedEntries(decisions);
     const dependencyPrefix = 'package.json#devDependencies.';
@@ -119,14 +138,17 @@ export async function update(options: {
     }
     if (failed) return 1;
 
+    const unresolvedPaths: string[] = [];
     for (const { row, action } of decisions) {
       if (action !== 'keep' && action !== 'keep-recorded') continue;
       const unresolved =
         action === 'keep' && (row.state === 'conflict' || row.state === 'unknown-origin');
+      if (unresolved) unresolvedPaths.push(row.path);
       warn(
         `Kept ${row.path}${row.disk === undefined ? ' (deleted locally)' : ''}${unresolved ? '; no choice recorded, doctor still needs action' : ''}`,
       );
     }
+    if (unresolvedPaths.length > 0) info(`Next: ${updateCommand(project.pm, unresolvedPaths)}`);
     warnAboutWorkspaceTypes(project.info.unresolvedWorkspaceTypes);
     if (project.info.isMonorepo) warnAboutWorkspacePackages(project.targetDir, 'update');
     success('Toolchain update complete.');

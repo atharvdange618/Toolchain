@@ -20,14 +20,15 @@ import { writeFile } from '../utils/fs.js';
 import { error, info, step, success, warn } from '../utils/logger.js';
 import { init } from './init.js';
 
-const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<typeof generatePlain>> = {
-  express: generateExpress,
-  nextjs: generateNextjs,
-  plain: generatePlain,
-  'pnpm-monorepo': generatePnpmMonorepo,
-  react: generateReact,
-  turbo: generateTurbo,
-};
+const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<typeof generatePlain>> =
+  {
+    express: generateExpress,
+    nextjs: generateNextjs,
+    plain: generatePlain,
+    'pnpm-monorepo': generatePnpmMonorepo,
+    react: generateReact,
+    turbo: generateTurbo,
+  };
 
 const NEXT_COMMAND: Record<TemplateType, string> = {
   express: 'start',
@@ -54,7 +55,9 @@ export async function scaffold(
   }
 
   if (!isValidProjectName(projectName)) {
-    error(`Invalid project name "${projectName}". Use lowercase letters, numbers, and hyphens only.`);
+    error(
+      `Invalid project name "${projectName}". Use lowercase letters, numbers, and hyphens only.`,
+    );
     process.exit(1);
   }
 
@@ -109,7 +112,9 @@ export async function scaffold(
     if (VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
       pm = options.pm as PackageManager;
     } else {
-      error(`Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`);
+      error(
+        `Invalid package manager "${options.pm}". Available: ${VALID_PACKAGE_MANAGERS.join(', ')}`,
+      );
       process.exit(1);
     }
   }
@@ -128,7 +133,9 @@ export async function scaffold(
   try {
     result = generator(ctx);
   } catch (error_) {
-    error(error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`);
+    error(
+      error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`,
+    );
     process.exit(1);
   }
 
@@ -150,7 +157,10 @@ export async function scaffold(
     }
 
     step(3, 'Writing package.json...');
-    writeFile(path.join(targetDir, 'package.json'), JSON.stringify(result.packageJson, null, 2) + '\n');
+    writeFile(
+      path.join(targetDir, 'package.json'),
+      JSON.stringify(result.packageJson, null, 2) + '\n',
+    );
     success('package.json');
   }
 
@@ -191,7 +201,9 @@ export async function scaffold(
   console.log(`\nNext steps:`);
   console.log(`  cd ${projectName}`);
   console.log(`  ${pm} run ${nextCmd}`);
-  console.log(`\nNote: If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`);
+  console.log(
+    `\nNote: If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`,
+  );
 }
 
 function isValidProjectName(name: string): boolean {

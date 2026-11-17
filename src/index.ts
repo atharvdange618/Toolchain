@@ -16,6 +16,8 @@ const __dirname = path.dirname(__filename);
 const pkgPath = path.join(__dirname, '..', 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string };
 
+const collect = (value: string, previous: string[]): string[] => [...previous, value];
+
 const program = new Command();
 
 program
@@ -36,11 +38,12 @@ program
   .command('doctor')
   .description('Check tracked toolchain declarations and hook source files without changing them')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
+  .option('--json', 'Print one JSON document for scripts and agents')
   .addHelpText(
     'after',
     '\nChecks root devDependency declarations, not node_modules or registry versions.\nChecks hook source files, not .husky/_ or Git setup.\nCreate-only .gitattributes and tsconfig.json are not checked.\nExits 1 when tracked entries need action; local edits and obsolete entries pass.',
   )
-  .action((options: { pm?: string }) => {
+  .action((options: { pm?: string; json?: boolean }) => {
     process.exitCode = doctor(options);
   });
 
@@ -49,9 +52,23 @@ program
   .description('Update toolchain entries while preserving local edits and deletions')
   .option('--yes', 'Keep conflicts without recording a choice')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
-  .action(async (options: { yes?: boolean; pm?: string }) => {
-    process.exitCode = await update(options);
-  });
+  .option(
+    '--keep <path>',
+    'Keep this differing entry and record it (repeatable; * allowed after #)',
+    collect,
+    [],
+  )
+  .option(
+    '--overwrite <path>',
+    'Overwrite this differing entry with the generated value (repeatable; * allowed after #)',
+    collect,
+    [],
+  )
+  .action(
+    async (options: { yes?: boolean; pm?: string; keep?: string[]; overwrite?: string[] }) => {
+      process.exitCode = await update(options);
+    },
+  );
 
 program
   .command('scaffold <project-name>')

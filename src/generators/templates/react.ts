@@ -26,8 +26,11 @@ function scaffoldReact(ctx: TemplateContext): void {
 
   // create-vite creates the directory itself, so run from parent
   const parentDir = path.dirname(targetDir);
-  execSync(`${pmDlx(pm)} create-vite@latest ${projectName} --template react-ts --no-immediate${flags}`, {
-    cwd: parentDir,
-    stdio: 'inherit',
-  });
+  execSync(
+    `${pmDlx(pm)} create-vite@latest ${projectName} --template react-ts --no-immediate${flags}`,
+    {
+      cwd: parentDir,
+      stdio: 'inherit',
+    },
+  );
 }
