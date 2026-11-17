@@ -87,7 +87,7 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Upgrade notes
 
-See "Upgrading from v1" in the README for the TS 7 `tsconfig` fixes and the full list of what `init` changes.
+See [docs/upgrading.md](docs/upgrading.md#from-v1) for the TS 7 `tsconfig` fixes and the full list of what `init` changes.
 
 ## Earlier versions
 
