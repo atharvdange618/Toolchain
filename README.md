@@ -104,6 +104,14 @@ pnpm dlx @atharvdange/toolchain update --yes --pm pnpm
 
 `update` applies stale or missing entries, preserves local edits and deletions, and prompts for conflicting or unknown-origin entries by file. Choices are keep all, overwrite all differing or review one by one; keep is the default. An interactive keep records the current generator as the base. `--yes` keeps those entries without recording a choice, so `update` can exit 0 while `doctor` still exits 1. Without `--yes`, a required prompt needs a terminal; cancellation aborts before writes.
 
+To choose without a prompt, pass `--keep <path>` or `--overwrite <path>` for each conflicting or unknown-origin entry, using the paths `doctor` prints. Both flags repeat. A `*` matches any text after the `#`, so `'.oxlintrc.json#rules.*'` covers every rule in that file, but the file name must be written out: `--keep '*'` is rejected, so you can't keep every entry without naming them. A flag keep is recorded like an interactive one. A path that matches no differing entry, or an entry matched by both flags, fails before any write.
+
+```bash
+pnpm dlx @atharvdange/toolchain update --pm pnpm --keep '.prettierrc' --overwrite '.oxlintrc.json#rules.*'
+```
+
+With no terminal and no `--yes`, `update` stops before writing and prints the command to rerun, with a `--keep` for each open entry plus every flag you already passed. The command uses your project's runner (`npx --yes`, `bunx`, `pnpm dlx` or `yarn dlx`) and quotes paths for a POSIX shell such as Git Bash. After `update --yes` keeps entries without a choice, it prints the same kind of command as `Next:`.
+
 For a project without `.toolchain.json`, run `doctor` first, then interactive `update`. Matching entries get a base automatically; differing entries need your choice because there is no earlier base. Review the diff and commit the manifest with the resulting configs. Re-running `init` would replace generated configs and scripts, so use it only when you want that reset.
 
 Deleted scripts and hooks stay deleted. A deleted required hook still fails `doctor`: restore it from Git, or remove just its path from `.toolchain.json`'s `entries` object and run `update` to recreate it. Hooks follow the scripts you keep, including deleted `typecheck` scripts. Missing required devDependencies are the exception: `update` restores them even after a local deletion, keeps existing version ranges, and never removes a dependency.

@@ -16,6 +16,8 @@ const __dirname = path.dirname(__filename);
 const pkgPath = path.join(__dirname, '..', 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string };
 
+const collect = (value: string, previous: string[]): string[] => [...previous, value];
+
 const program = new Command();
 
 program
@@ -49,9 +51,23 @@ program
   .description('Update toolchain entries while preserving local edits and deletions')
   .option('--yes', 'Keep conflicts without recording a choice')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
-  .action(async (options: { yes?: boolean; pm?: string }) => {
-    process.exitCode = await update(options);
-  });
+  .option(
+    '--keep <path>',
+    'Keep this differing entry and record it (repeatable; * allowed after #)',
+    collect,
+    [],
+  )
+  .option(
+    '--overwrite <path>',
+    'Overwrite this differing entry with the generated value (repeatable; * allowed after #)',
+    collect,
+    [],
+  )
+  .action(
+    async (options: { yes?: boolean; pm?: string; keep?: string[]; overwrite?: string[] }) => {
+      process.exitCode = await update(options);
+    },
+  );
 
 program
   .command('scaffold <project-name>')

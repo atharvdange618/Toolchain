@@ -185,7 +185,7 @@ describe('update decisions and adoption', () => {
     const before = files();
     expect(await run(false)).toBe(1);
     expect(files()).toEqual(before);
-    expect(stderr()).toContain('TTY');
+    expect(stderr()).toContain('has no terminal to ask');
   });
 
   it('keeps --yes conflicts and their old base so doctor still fails', async () => {
@@ -195,6 +195,170 @@ describe('update decisions and adoption', () => {
     expect(read('.prettierrc')).toBe('local\n');
     expect(read('.toolchain.json')).toBe(manifest);
     expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(1);
+  });
+});
+
+describe('--keep and --overwrite', () => {
+  function unknown(file: string): void {
+    base(file, undefined);
+    put(file, 'local\n');
+  }
+  function noTTY(): void {
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, get: () => false });
+  }
+  async function flagged(keep: string[], overwrite: string[] = [], yes = false): Promise<number> {
+    return update({ targetDir: dir, pm: 'pnpm', yes, keep, overwrite });
+  }
+  function expectNothingRan(before: Record<string, string>): void {
+    expect(files()).toEqual(before);
+    expect(getToolchainDeps).not.toHaveBeenCalled();
+    expect(execSync).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+  }
+
+  it('records a flag keep without a terminal so doctor passes', async () => {
+    const generated = read('.prettierrc');
+    unknown('.prettierrc');
+    noTTY();
+    expect(await flagged(['.prettierrc'])).toBe(0);
+    // Like an interactive keep, the recorded base is the generator's value.
+    expect(parseManifest(read('.toolchain.json'))?.entries['.prettierrc']).toBe(
+      hashEntry('.prettierrc', generated),
+    );
+    expect(read('.prettierrc')).toBe('local\n');
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cross-file wildcard before reading the project', async () => {
+    unknown('.prettierrc');
+    noTTY();
+    const before = files();
+    expect(await flagged(['*'])).toBe(1);
+    expect(stderr()).toMatch(/file name before # must be literal/);
+    expectNothingRan(before);
+  });
+
+  it('rejects a keep that matches nothing', async () => {
+    unknown('.prettierrc');
+    noTTY();
+    const before = files();
+    expect(await flagged(['.prettierrc', '.nope'])).toBe(1);
+    expect(stderr()).toContain("No differing entry matches --keep '.nope'");
+    expectNothingRan(before);
+  });
+
+  it('reports a typo instead of a retry when another row is still open', async () => {
+    unknown('.prettierrc');
+    unknown('.editorconfig');
+    noTTY();
+    const before = files();
+    expect(await flagged(['.nope', '.prettierrc'])).toBe(1);
+    expect(stderr()).toContain("No differing entry matches --keep '.nope'");
+    expect(stderr()).not.toContain('Rerun with a choice');
+    expectNothingRan(before);
+  });
+
+  it('does not report a hook keep as unused after the first pass', async () => {
+    unknown('.husky/pre-commit');
+    noTTY();
+    expect(await flagged(['.husky/pre-commit'])).toBe(0);
+    expect(read('.husky/pre-commit')).toBe('local\n');
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
+  });
+
+  it('prints the next command for entries --yes kept without a choice', async () => {
+    unknown('.prettierrc');
+    noTTY();
+    expect(await run()).toBe(0);
+    expect(stdout()).toContain(
+      "Next: pnpm dlx @atharvdange/toolchain update --pm pnpm --keep '.prettierrc'",
+    );
+  });
+
+  it('keeps a supplied overwrite in the first-pass retry, and the retry converges', async () => {
+    const generated = read('.prettierrc');
+    unknown('.prettierrc');
+    unknown('.editorconfig');
+    noTTY();
+    const before = files();
+    expect(await flagged([], ['.prettierrc'])).toBe(1);
+    expect(stderr()).toContain(
+      "pnpm dlx @atharvdange/toolchain update --pm pnpm --keep '.editorconfig' --overwrite '.prettierrc'",
+    );
+    expectNothingRan(before);
+
+    expect(await flagged(['.editorconfig'], ['.prettierrc'])).toBe(0);
+    expect(read('.prettierrc')).toBe(generated);
+    expect(read('.editorconfig')).toBe('local\n');
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
+  });
+
+  it('keeps a first-pass overwrite in the hook-pass retry, and the retry converges', async () => {
+    const generated = read('.prettierrc');
+    unknown('.prettierrc');
+    unknown('.husky/pre-commit');
+    noTTY();
+    const before = files();
+    expect(await flagged([], ['.prettierrc'])).toBe(1);
+    expect(stderr()).toContain(
+      "update --pm pnpm --keep '.husky/pre-commit' --overwrite '.prettierrc'",
+    );
+    expectNothingRan(before);
+
+    expect(await flagged(['.husky/pre-commit'], ['.prettierrc'])).toBe(0);
+    expect(read('.prettierrc')).toBe(generated);
+    expect(read('.husky/pre-commit')).toBe('local\n');
+    expect(doctor({ targetDir: dir, pm: 'pnpm' })).toBe(0);
+  });
+
+  it('keeps a hook choice in the first-pass retry', async () => {
+    unknown('.prettierrc');
+    unknown('.husky/pre-commit');
+    noTTY();
+    const before = files();
+    expect(await flagged([], ['.husky/pre-commit'])).toBe(1);
+    expect(stderr()).toContain(
+      "update --pm pnpm --keep '.prettierrc' --overwrite '.husky/pre-commit'",
+    );
+    expectNothingRan(before);
+  });
+
+  describe.each([false, true])('with yes=%s', (yes) => {
+    it('rejects keep and overwrite on the same rule', async () => {
+      const config = json('.oxlintrc.json');
+      (config['rules'] as Record<string, unknown>)['import/no-cycle'] = 'off';
+      putJson('.oxlintrc.json', config);
+      base('.oxlintrc.json#rules.import/no-cycle', '"error"');
+      noTTY();
+      const before = files();
+      expect(
+        await flagged(['.oxlintrc.json#rules.*'], ['.oxlintrc.json#rules.import/no-cycle'], yes),
+      ).toBe(1);
+      expect(stderr()).toContain('.oxlintrc.json#rules.import/no-cycle matches both');
+      expectNothingRan(before);
+    });
+
+    it('rejects an unused exact path', async () => {
+      noTTY();
+      const before = files();
+      expect(await flagged([], ['.prettierrc'], yes)).toBe(1);
+      expect(stderr()).toContain("No differing entry matches --overwrite '.prettierrc'");
+      expectNothingRan(before);
+    });
+
+    it('rejects a wildcard that matches only in-sync and stale rows', async () => {
+      const config = json('.oxlintrc.json');
+      const rules = config['rules'] as Record<string, unknown>;
+      const [rule, value] = Object.entries(rules)[0] ?? [];
+      if (rule === undefined) throw new Error('fixture has no rules');
+      base(`.oxlintrc.json#rules.${rule}`, JSON.stringify(value === 'off' ? 'warn' : 'off'));
+      noTTY();
+      const before = files();
+      expect(await flagged(['.oxlintrc.json#rules.*'], [], yes)).toBe(1);
+      expect(stderr()).toContain("No differing entry matches --keep '.oxlintrc.json#rules.*'");
+      expectNothingRan(before);
+    });
   });
 });
 
