@@ -36,10 +36,13 @@ run_case() {
   if [ "$template" = expo ]; then
     # No expo scaffold template: Expo users run init on a create-expo-app
     # project, so do that, then lint:fix and format as scaffold would.
-    # Expo has no build script.
+    # Expo has no build script. create-expo-app has no package manager flag
+    # and picks one from npm_config_user_agent, which `pnpm run smoke` sets
+    # to pnpm; init's npm install then crashes on the pnpm tree.
     scripts="lint typecheck format:check"
     {
-      npx --yes create-expo-app@latest app --template blank-typescript --yes \
+      npm_config_user_agent="$pm/smoke" \
+        npx --yes create-expo-app@latest app --template blank-typescript --yes \
         && cd app && { [ -d .git ] || git init -q; } \
         && node "$CLI" init --yes --pm "$pm" \
         && "$pm" run lint:fix && "$pm" run format
