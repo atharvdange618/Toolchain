@@ -9,7 +9,7 @@ set -uo pipefail
 
 CASES=("$@")
 if [ ${#CASES[@]} -eq 0 ]; then
-  CASES=(plain:npm plain:pnpm express:npm react:npm nextjs:npm pnpm-monorepo:pnpm turbo:pnpm)
+  CASES=(plain:npm plain:pnpm express:npm react:npm nextjs:npm expo:npm pnpm-monorepo:pnpm turbo:pnpm)
 fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,12 +32,29 @@ run_case() {
   local dir="$WORK/$template-$pm" result="" failed=0
   mkdir -p "$dir/logs" && cd "$dir"
 
-  node "$CLI" scaffold app --template "$template" --pm "$pm" --yes > logs/scaffold.log 2>&1
-  [ $? -eq 0 ] && result="scaffold:ok" || { result="scaffold:FAIL"; failed=1; }
+  local scripts="lint typecheck format:check build"
+  if [ "$template" = expo ]; then
+    # No expo scaffold template: Expo users run init on a create-expo-app
+    # project, so do that, then lint:fix and format as scaffold would.
+    # Expo has no build script.
+    scripts="lint typecheck format:check"
+    {
+      npx --yes create-expo-app@latest app --template blank-typescript --yes \
+        && cd app && { [ -d .git ] || git init -q; } \
+        && node "$CLI" init --yes --pm "$pm" \
+        && "$pm" run lint:fix && "$pm" run format
+    } > logs/scaffold.log 2>&1
+    local code=$?
+    cd "$dir"
+  else
+    node "$CLI" scaffold app --template "$template" --pm "$pm" --yes > logs/scaffold.log 2>&1
+    local code=$?
+  fi
+  [ $code -eq 0 ] && result="scaffold:ok" || { result="scaffold:FAIL"; failed=1; }
 
   if cd app 2>/dev/null; then
     git config user.email smoke@example.com && git config user.name smoke
-    for script in lint typecheck format:check build; do
+    for script in $scripts; do
       if "$pm" run "$script" > "../logs/$script.log" 2>&1; then result="$result $script:ok"
       else result="$result $script:FAIL"; failed=1; fi
     done
