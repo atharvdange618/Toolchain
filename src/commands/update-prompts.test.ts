@@ -1,4 +1,4 @@
-import prompts from 'prompts';
+import * as clack from '@clack/prompts';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 import type { ChoiceFlags } from '../manifest/choices.js';
@@ -6,7 +6,12 @@ import type { Comparison, State } from '../manifest/classify.js';
 import * as writer from '../manifest/write.js';
 import { chooseConflicts } from './update-prompts.js';
 
-let select: MockInstance<typeof prompts.prompts.select>;
+vi.mock('@clack/prompts', async (importOriginal) => ({
+  ...(await importOriginal<typeof clack>()),
+  select: vi.fn(),
+}));
+
+let select: ReturnType<typeof vi.mocked<typeof clack.select>>;
 let output: MockInstance<typeof console.log>;
 
 function row(path: string, state: State = 'conflict'): Comparison {
@@ -21,13 +26,11 @@ function opts(
 }
 
 beforeEach(() => {
-  // Keep the installed prompts engine, including its cancellation handling.
-  select = vi.spyOn(prompts.prompts, 'select').mockImplementation(() => 'keep');
+  select = vi.mocked(clack.select).mockReset().mockResolvedValue('keep');
   output = vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
 afterEach(() => {
-  Reflect.deleteProperty(prompts, '_injected');
   vi.restoreAllMocks();
 });
 
@@ -37,8 +40,8 @@ describe('chooseConflicts', () => {
       row(`.oxlintrc.json#rules.rule-${index}`, 'unknown-origin'),
     );
     select.mockImplementation((question) => {
-      expect(question.initial).toBe(0);
-      expect(Array.isArray(question.choices) ? question.choices[0] : undefined).toMatchObject({
+      expect(question.initialValue).toBe('keep');
+      expect(question.options[0]).toMatchObject({
         value: 'keep',
       });
       expect(question.message).toContain('.oxlintrc.json');
@@ -47,7 +50,7 @@ describe('chooseConflicts', () => {
       expect(text).toContain('- "local"');
       expect(text).toContain('+ "new"');
       expect(text).not.toContain('need action');
-      return 'keep';
+      return Promise.resolve('keep');
     });
     const choices = await chooseConflicts(rows, opts({ yes: false, isTTY: true }));
     expect(select).toHaveBeenCalledTimes(1);
@@ -57,7 +60,7 @@ describe('chooseConflicts', () => {
   it.each(['keep', 'overwrite'])(
     'applies %s-all only to conflict and unknown-origin rows',
     async (choice) => {
-      select.mockImplementation(() => choice);
+      select.mockResolvedValue(choice);
       const eligible = [
         row('package.json#scripts.lint'),
         row('package.json#scripts.format', 'unknown-origin'),
@@ -89,22 +92,22 @@ describe('chooseConflicts', () => {
       row('package.json#scripts.format', 'unknown-origin'),
     ];
     select
-      .mockImplementationOnce(() => 'review')
+      .mockResolvedValueOnce('review')
       .mockImplementationOnce((question) => {
         expect(question.message).toContain(rows[0]?.path);
-        expect(question.initial).toBe(0);
-        expect(Array.isArray(question.choices) ? question.choices[0] : undefined).toMatchObject({
+        expect(question.initialValue).toBe('keep');
+        expect(question.options[0]).toMatchObject({
           value: 'keep',
         });
-        return 'overwrite';
+        return Promise.resolve('overwrite');
       })
       .mockImplementationOnce((question) => {
         expect(question.message).toContain(rows[1]?.path);
-        expect(question.initial).toBe(0);
-        expect(Array.isArray(question.choices) ? question.choices[0] : undefined).toMatchObject({
+        expect(question.initialValue).toBe('keep');
+        expect(question.options[0]).toMatchObject({
           value: 'keep',
         });
-        return 'keep';
+        return Promise.resolve('keep');
       });
     expect(await chooseConflicts(rows, opts({ yes: false, isTTY: true }))).toEqual(
       new Map([
@@ -135,10 +138,10 @@ describe('chooseConflicts', () => {
     expect(select).not.toHaveBeenCalled();
   });
 
-  it('rejects late cancellation through the installed injected-answer API without writing or recording a manifest', async () => {
+  it('rejects late cancellation without writing or recording a manifest', async () => {
     const apply = vi.spyOn(writer, 'applyWrites');
     const manifest = vi.spyOn(writer, 'writeManifest');
-    prompts.inject(['overwrite', new Error('cancelled')]);
+    select.mockResolvedValueOnce('overwrite').mockResolvedValueOnce(clack.CANCEL_SYMBOL);
     const result = chooseConflicts(
       [row('.prettierrc'), row('package.json#scripts.lint')],
       opts({ yes: false, isTTY: true }),
@@ -207,7 +210,7 @@ describe('chooseConflicts', () => {
   });
 
   it('rejects cancellation while reviewing a path', async () => {
-    prompts.inject(['review', new Error('cancelled')]);
+    select.mockResolvedValueOnce('review').mockResolvedValueOnce(clack.CANCEL_SYMBOL);
     await expect(
       chooseConflicts([row('.prettierrc')], opts({ yes: false, isTTY: true })),
     ).rejects.toThrow(/abort|cancel/i);

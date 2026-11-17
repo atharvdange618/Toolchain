@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import prompts from 'prompts';
+import { isCancel, select } from '@clack/prompts';
 
 import { type PackageManager, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
 import { generateExpress } from '../generators/templates/express.js';
@@ -17,7 +17,7 @@ import { generatePnpmMonorepo } from '../generators/templates/pnpm-monorepo.js';
 import { generateReact } from '../generators/templates/react.js';
 import { generateTurbo } from '../generators/templates/turbo.js';
 import { writeFile } from '../utils/fs.js';
-import { error, info, step, success, warn } from '../utils/logger.js';
+import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
 import { init } from './init.js';
 
 const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<typeof generatePlain>> =
@@ -78,22 +78,24 @@ export async function scaffold(
     process.exit(1);
   }
 
+  intro(`Create ${projectName}`);
   if (!template && !options.yes) {
-    const response = await prompts({
-      choices: TEMPLATES.map((t) => ({
-        description: TEMPLATE_DESCRIPTIONS[t],
-        title: t,
+    if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+      throw new Error('Scaffold has no terminal to ask. Rerun with --template <type>.');
+    }
+    const selected = await select({
+      options: TEMPLATES.map((t) => ({
+        hint: TEMPLATE_DESCRIPTIONS[t],
+        label: t,
         value: t,
       })),
       message: 'Select a project template:',
-      name: 'template',
-      type: 'select',
     });
-    template = response.template as TemplateType;
-    if (!template) {
+    if (isCancel(selected)) {
       warn('Aborted by user.');
       return;
     }
+    template = selected;
   }
 
   if (!template) {
@@ -141,22 +143,22 @@ export async function scaffold(
 
   if (result.scaffold) {
     // CLI-based template (react, nextjs) - let the external tool handle project creation
-    step(1, `Running ${template} scaffolding tool...`);
+    step(`Running ${template} scaffolding tool...`);
     result.scaffold(ctx);
     success('Project files created by official tooling');
   } else {
     // File-based template - create directory and write files ourselves
-    step(1, 'Creating project directory...');
+    step('Creating project directory...');
     mkdirSync(targetDir, { recursive: true });
 
-    step(2, 'Generating project files...');
+    step('Generating project files...');
     for (const file of result.files) {
       const filePath = path.join(targetDir, file.path);
       writeFile(filePath, file.content);
       success(file.path);
     }
 
-    step(3, 'Writing package.json...');
+    step('Writing package.json...');
     writeFile(
       path.join(targetDir, 'package.json'),
       JSON.stringify(result.packageJson, null, 2) + '\n',
@@ -164,11 +166,9 @@ export async function scaffold(
     success('package.json');
   }
 
-  let stepNumber = result.scaffold ? 2 : 4;
-
   // create-next-app makes a repo, create-vite doesn't. Husky needs one.
   if (!existsSync(path.join(targetDir, '.git'))) {
-    step(stepNumber++, 'Initializing git repository...');
+    step('Initializing git repository...');
     try {
       execSync('git init', { cwd: targetDir, stdio: 'inherit' });
       success('Git repository initialized');
@@ -177,12 +177,12 @@ export async function scaffold(
     }
   }
 
-  step(stepNumber++, 'Setting up toolchain...');
-  await init({ pm, targetDir, yes: true });
+  step('Setting up toolchain...');
+  await init({ pm, targetDir, yes: true, nested: true });
 
   // Generated code (ours, create-vite's, create-next-app's) doesn't follow the
   // rules init just set up, so a new project would fail its own checks.
-  step(stepNumber, 'Fixing lint and formatting generated files...');
+  step('Fixing lint and formatting generated files...');
   try {
     execSync(`${pm} run lint:fix`, { cwd: targetDir, stdio: 'inherit' });
   } catch {
@@ -196,14 +196,11 @@ export async function scaffold(
   }
 
   const nextCmd = NEXT_COMMAND[template];
-  console.log(`\n${'='.repeat(50)}`);
-  success(`Project "${projectName}" is ready!`);
-  console.log(`\nNext steps:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`  ${pm} run ${nextCmd}`);
-  console.log(
-    `\nNote: If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`,
+  info(
+    `If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`,
   );
+  note(`cd ${projectName}\n${pm} run ${nextCmd}`, 'Next steps');
+  outro(`Project "${projectName}" is ready!`);
 }
 
 function isValidProjectName(name: string): boolean {

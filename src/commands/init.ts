@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
-import prompts from 'prompts';
+import { confirm, isCancel } from '@clack/prompts';
 
 import {
   detect,
@@ -19,7 +19,7 @@ import { hashEntry, type Manifest } from '../manifest/manifest.js';
 import { trackedEntries, validatePackageJson } from '../manifest/project.js';
 import { writeManifest } from '../manifest/write.js';
 import { readJson } from '../utils/fs.js';
-import { error, info, step, success, warn } from '../utils/logger.js';
+import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
 
 // v2 lints with oxlint, so an ESLint config left in the project does nothing.
 // Renaming instead of deleting keeps any custom rules the user wrote. The
@@ -67,6 +67,7 @@ export async function init(options: {
   pm?: string;
   targetDir?: string;
   yes?: boolean;
+  nested?: boolean;
 }): Promise<void> {
   if (options.pm && !VALID_PACKAGE_MANAGERS.includes(options.pm as PackageManager)) {
     error(
@@ -91,14 +92,16 @@ export async function init(options: {
     return process.exit(1);
   }
 
-  step(1, 'Detecting project environment...');
+  if (!options.nested) intro('Toolchain setup');
+  step('Detecting project environment...');
   const projectInfo = detect(targetDir);
   // Resolved once so the hooks and the install can't disagree.
   const pm: PackageManager =
     (options.pm as PackageManager | undefined) ?? projectInfo.packageManager;
-  info(`Framework: ${projectInfo.framework}`);
-  info(`Package manager: ${pm}`);
-  info(`Monorepo: ${projectInfo.isMonorepo ? 'Yes' : 'No'}`);
+  note(
+    `Framework: ${projectInfo.framework}\nPackage manager: ${pm}\nMonorepo: ${projectInfo.isMonorepo ? 'Yes' : 'No'}`,
+    'Detected project',
+  );
 
   // Before the prompt, so the user isn't asked to proceed and then refused.
   if (projectInfo.unsupported) refuseUnsupported(projectInfo.unsupported);
@@ -116,13 +119,14 @@ export async function init(options: {
   warnAboutWorkspaceTypes(projectInfo.unresolvedWorkspaceTypes);
 
   if (!options.yes) {
-    const response = await prompts({
-      initial: true,
+    if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+      throw new Error('Init has no terminal to ask. Rerun with --yes to proceed.');
+    }
+    const proceed = await confirm({
+      initialValue: true,
       message: `Proceed with toolchain setup for ${projectInfo.framework} project?`,
-      name: 'proceed',
-      type: 'confirm',
     });
-    if (!response.proceed) {
+    if (isCancel(proceed) || !proceed) {
       warn('Aborted by user.');
       return;
     }
@@ -144,7 +148,7 @@ export async function init(options: {
     else info(message.text);
   }
 
-  step(2, 'Writing config files...');
+  step('Writing config files...');
   moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
   moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
   applyEntries(targetDir, plan.entries);
@@ -165,7 +169,7 @@ export async function init(options: {
   success('package.json updated with scripts, lint-staged, and devDependencies');
   if (projectInfo.isMonorepo) warnAboutWorkspacePackages(targetDir);
 
-  step(3, `Installing dependencies with ${pm}...`);
+  step(`Installing dependencies with ${pm}...`);
   try {
     execSync(`${pm} install`, { cwd: targetDir, stdio: 'inherit' });
   } catch {
@@ -174,7 +178,7 @@ export async function init(options: {
   }
   success('Dependencies installed');
 
-  step(4, 'Initializing Husky...');
+  step('Initializing Husky...');
   try {
     execSync(`${pmExec(pm)} husky`, { cwd: targetDir, stdio: 'inherit' });
   } catch {
@@ -183,15 +187,12 @@ export async function init(options: {
   }
   success('Husky initialized');
 
-  console.log(`\n${'='.repeat(50)}`);
-  success('Toolchain is ready!');
-  console.log(
-    '\nSupported: Next.js, Vite + React, Expo, Express, plain TypeScript, and pnpm/Turbo monorepos.',
+  if (options.nested) return;
+  info(
+    'Supported: Next.js, Vite + React, Expo, Express, plain TypeScript, and pnpm/Turbo monorepos.',
   );
-  console.log(`\nNext steps:`);
-  console.log(`  1. ${pm} run lint:fix`);
-  console.log(`  2. ${pm} run typecheck`);
-  console.log(`  3. Make a test commit to verify hooks`);
+  note(`${pm} run lint:fix\n${pm} run typecheck\nMake a test commit to verify hooks`, 'Next steps');
+  outro('Toolchain is ready!');
 }
 
 // Writing our configs into a Vue, Svelte, Astro or Angular project would hand

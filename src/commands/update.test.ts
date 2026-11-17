@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import prompts from 'prompts';
+import * as clack from '@clack/prompts';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 import { hashEntry, parseManifest, serializeManifest } from '../manifest/manifest.js';
@@ -11,6 +11,11 @@ import { getToolchainDeps, TOOLCHAIN_DEP_NAMES } from '../utils/versions.js';
 import { doctor } from './doctor.js';
 import { init } from './init.js';
 import { update } from './update.js';
+
+vi.mock('@clack/prompts', async (importOriginal) => ({
+  ...(await importOriginal<typeof clack>()),
+  select: vi.fn(),
+}));
 
 vi.mock('node:fs', async (importOriginal) => ({ ...(await importOriginal<typeof fs>()) }));
 vi.mock('node:child_process', () => ({ execSync: vi.fn() }));
@@ -27,8 +32,9 @@ vi.mock('../utils/versions.js', async (importOriginal) => {
 let dir: string;
 let output: MockInstance<typeof process.stdout.write>;
 let errors: MockInstance<typeof process.stderr.write>;
-let select: MockInstance<typeof prompts.prompts.select>;
+let select: ReturnType<typeof vi.mocked<typeof clack.select>>;
 const originalTTY = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+const originalOutputTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
 
 function put(file: string, content: string): void {
   fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
@@ -96,7 +102,8 @@ beforeEach(async () => {
   errors = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   Object.defineProperty(process.stdin, 'isTTY', { configurable: true, get: () => true });
-  select = vi.spyOn(prompts.prompts, 'select').mockImplementation(() => 'keep');
+  Object.defineProperty(process.stdout, 'isTTY', { configurable: true, get: () => true });
+  select = vi.mocked(clack.select).mockReset().mockResolvedValue('keep');
   vi.mocked(execSync).mockReset();
   vi.mocked(getToolchainDeps)
     .mockReset()
@@ -107,11 +114,12 @@ beforeEach(async () => {
   output.mockClear();
 });
 afterEach(() => {
-  Reflect.deleteProperty(prompts, '_injected');
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   if (originalTTY) Object.defineProperty(process.stdin, 'isTTY', originalTTY);
   else Reflect.deleteProperty(process.stdin, 'isTTY');
+  if (originalOutputTTY) Object.defineProperty(process.stdout, 'isTTY', originalOutputTTY);
+  else Reflect.deleteProperty(process.stdout, 'isTTY');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -158,7 +166,7 @@ describe('update decisions and adoption', () => {
     putJson('.oxlintrc.json', config);
     base('.oxlintrc.json#rules.typescript/no-explicit-any', '"warn"');
     const original = read('.oxlintrc.json');
-    select.mockImplementation(() => 'overwrite');
+    select.mockResolvedValue('overwrite');
     expect(await run(false)).toBe(0);
     expect(read('.oxlintrc.json.bak')).toBe(original);
     expect(fs.existsSync(path.join(dir, '.oxlintrc.json.bak.1'))).toBe(false);
@@ -172,7 +180,7 @@ describe('update decisions and adoption', () => {
     base('package.json#scripts.lint', '"old"');
     conflict('.husky/pre-commit');
     const before = files();
-    prompts.inject(['overwrite', new Error('cancel')]);
+    select.mockResolvedValueOnce('overwrite').mockResolvedValueOnce(clack.CANCEL_SYMBOL);
     expect(await run(false)).toBe(1);
     expect(files()).toEqual(before);
     expect(stderr()).toContain('cancelled');
@@ -185,6 +193,17 @@ describe('update decisions and adoption', () => {
     const before = files();
     expect(await run(false)).toBe(1);
     expect(files()).toEqual(before);
+    expect(stderr()).toContain('has no terminal to ask');
+  });
+
+  it('prints a retry without prompting when only stdin is a terminal', async () => {
+    vi.spyOn(process.stdout, 'isTTY', 'get').mockReturnValue(false);
+    conflict();
+    const before = files();
+    expect(await run(false)).toBe(1);
+    expect(select).not.toHaveBeenCalled();
+    expect(files()).toEqual(before);
+    expect(getToolchainDeps).not.toHaveBeenCalled();
     expect(stderr()).toContain('has no terminal to ask');
   });
 
@@ -399,13 +418,11 @@ describe('script-first hooks and root-only scope', () => {
       });
       base('package.json#scripts.lint', '"old lint"');
       conflict('.husky/pre-commit');
-      select
-        .mockImplementationOnce(() => 'keep')
-        .mockImplementationOnce((question) => {
-          expect(String(question.message)).toContain('.husky/pre-commit');
-          expect(read('package.json')).toContain('custom lint');
-          return hookChoice;
-        });
+      select.mockResolvedValueOnce('keep').mockImplementationOnce((question) => {
+        expect(String(question.message)).toContain('.husky/pre-commit');
+        expect(read('package.json')).toContain('custom lint');
+        return Promise.resolve(hookChoice);
+      });
       expect(await run(false)).toBe(0);
       expect(select).toHaveBeenCalledTimes(2);
       const hook = read('.husky/pre-commit');
@@ -437,7 +454,7 @@ describe('script-first hooks and root-only scope', () => {
     base('package.json#scripts.lint', '"old lint"');
     put('.husky/pre-commit', 'pnpm exec lint-staged\npnpm run typecheck\n');
     base('.husky/pre-commit', read('.husky/pre-commit'));
-    select.mockImplementation(() => 'overwrite');
+    select.mockResolvedValue('overwrite');
     expect(await run(false)).toBe(0);
     expect(select).toHaveBeenCalledTimes(1);
     expect((json('package.json')['scripts'] as Record<string, string>)['lint']).toBe(
@@ -552,7 +569,7 @@ describe('dependency restoration and recovery', () => {
     const pkg = read('package.json');
     select.mockImplementationOnce(() => {
       put('package.json', `${pkg} `);
-      return 'overwrite';
+      return Promise.resolve('overwrite');
     });
     expect(await run(false)).toBe(1);
     expect(read('.prettierrc')).toBe('local\n');
@@ -591,7 +608,7 @@ describe('dependency restoration and recovery', () => {
       if (String(source).endsWith('.prettierignore')) throw new Error('backup denied');
       copy(source, destination, mode);
     });
-    select.mockImplementation(() => 'overwrite');
+    select.mockResolvedValue('overwrite');
     expect(await run(false)).toBe(1);
     for (const [file, content] of Object.entries(before)) {
       expect(fs.readFileSync(path.join(dir, file)).toString('base64')).toBe(content);
@@ -679,7 +696,7 @@ describe('dependency restoration and recovery', () => {
       const pkg = read('package.json');
       const manifest = read('.toolchain.json');
       if (failure === 'backup') {
-        select.mockImplementation(() => 'overwrite');
+        select.mockResolvedValue('overwrite');
         vi.spyOn(fs, 'copyFileSync').mockImplementation(() => {
           throw new Error('backup denied');
         });

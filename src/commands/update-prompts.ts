@@ -1,4 +1,4 @@
-import prompts from 'prompts';
+import { isCancel, select } from '@clack/prompts';
 
 import type { PackageManager } from '../detectors/project.js';
 import {
@@ -67,39 +67,29 @@ export async function chooseConflicts(
 
   for (const [file, group] of files) {
     reportComparisons(group, { footer: false });
-    const response = await prompts(
-      {
-        type: 'select',
-        name: 'choice',
-        message: `${file}: how should these differing entries change?`,
-        choices: [
-          { title: 'Keep all (recorded as local edits)', value: 'keep' },
-          { title: 'Overwrite all differing', value: 'overwrite' },
-          { title: 'Review one by one', value: 'review' },
-        ],
-        initial: 0,
-      },
-      { onCancel },
-    );
-    const choice: unknown = response['choice'];
+    const choice = await select<Choice | 'review'>({
+      message: `${file}: how should these differing entries change?`,
+      options: [
+        { label: 'Keep all (recorded as local edits)', value: 'keep' },
+        { label: 'Overwrite all differing', value: 'overwrite' },
+        { label: 'Review one by one', value: 'review' },
+      ],
+      initialValue: 'keep',
+    });
+    if (isCancel(choice)) onCancel();
     if (choice === 'keep' || choice === 'overwrite') {
       for (const row of group) choices.set(row.path, choice);
     } else if (choice === 'review') {
       for (const row of group) {
-        const answer = await prompts(
-          {
-            type: 'select',
-            name: 'choice',
-            message: row.path,
-            choices: [
-              { title: 'Keep (recorded as a local edit)', value: 'keep' },
-              { title: 'Overwrite', value: 'overwrite' },
-            ],
-            initial: 0,
-          },
-          { onCancel },
-        );
-        const entryChoice: unknown = answer['choice'];
+        const entryChoice = await select<Choice>({
+          message: row.path,
+          options: [
+            { label: 'Keep (recorded as a local edit)', value: 'keep' },
+            { label: 'Overwrite', value: 'overwrite' },
+          ],
+          initialValue: 'keep',
+        });
+        if (isCancel(entryChoice)) onCancel();
         if (entryChoice !== 'keep' && entryChoice !== 'overwrite') onCancel();
         choices.set(row.path, entryChoice);
       }

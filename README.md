@@ -19,6 +19,8 @@ npx @atharvdange/toolchain init
 
 Use `pnpm dlx`, `yarn dlx` (Yarn 2+) or `bunx` in place of `npx` to match your package manager. The examples below use `pnpm dlx`.
 
+Requires Node.js 20.12 or later.
+
 ## What it supports
 
 | Project                                      | Status    |

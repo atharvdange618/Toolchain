@@ -13,7 +13,7 @@ import {
   prepareWrites,
   writeManifest,
 } from '../manifest/write.js';
-import { error, info, success, warn } from '../utils/logger.js';
+import { error, info, intro, outro, warn } from '../utils/logger.js';
 import { getToolchainDeps } from '../utils/versions.js';
 import { warnAboutWorkspacePackages, warnAboutWorkspaceTypes } from './init.js';
 import { chooseConflicts } from './update-prompts.js';
@@ -45,9 +45,10 @@ export async function update(options: {
         ...Object.keys(project.manifest ?? {}),
       ].map((entryPath) => entryPath.split('#')[0] ?? entryPath),
     );
+    intro('Toolchain update');
     const promptOptions = {
       yes: options.yes ?? false,
-      isTTY: process.stdin.isTTY === true,
+      isTTY: process.stdin.isTTY === true && process.stdout.isTTY === true,
       pm: project.pm,
       flags,
       used: new Set<string>(),
@@ -151,7 +152,7 @@ export async function update(options: {
     if (unresolvedPaths.length > 0) info(`Next: ${updateCommand(project.pm, unresolvedPaths)}`);
     warnAboutWorkspaceTypes(project.info.unresolvedWorkspaceTypes);
     if (project.info.isMonorepo) warnAboutWorkspacePackages(project.targetDir, 'update');
-    success('Toolchain update complete.');
+    outro('Toolchain update complete.');
     return 0;
   } catch (error_) {
     error(error_ instanceof Error ? error_.message : String(error_));
