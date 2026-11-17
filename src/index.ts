@@ -38,11 +38,12 @@ program
   .command('doctor')
   .description('Check tracked toolchain declarations and hook source files without changing them')
   .option('--pm <manager>', 'Package manager to use (bun, npm, pnpm, yarn)')
+  .option('--json', 'Print one JSON document for scripts and agents')
   .addHelpText(
     'after',
     '\nChecks root devDependency declarations, not node_modules or registry versions.\nChecks hook source files, not .husky/_ or Git setup.\nCreate-only .gitattributes and tsconfig.json are not checked.\nExits 1 when tracked entries need action; local edits and obsolete entries pass.',
   )
-  .action((options: { pm?: string }) => {
+  .action((options: { pm?: string; json?: boolean }) => {
     process.exitCode = doctor(options);
   });
 

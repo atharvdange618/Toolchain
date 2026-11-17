@@ -231,7 +231,7 @@ interface DoctorJson {
 
 This is an object rather than the bare array we discussed. The `next` command and the manifest flag need a home, and an array can't hold them without breaking its shape later.
 
-- [ ] **Step 1: Write the failing tests** in `doctor.test.ts`. Capture `process.stdout.write`.
+- [x] **Step 1: Write the failing tests** in `doctor.test.ts`. Capture `process.stdout.write`.
   - Fresh init with `json: true` returns 0. The output passes `JSON.parse` and gives `manifest: true`, `needsAction: false` and `next: null`. Every row has all six keys, and absent values are `null`, not missing.
   - Delete `.toolchain.json`, set `import/no-cycle` to `"error"` (the generator writes `warn`) and change `.prettierrc`. Then `manifest` is `false`, and:
     - The JSON row for the rule has `state: 'local-edit'` and `stricter: true`.
@@ -240,11 +240,11 @@ This is an object rather than the bare array we discussed. The `next` command an
     - `console.log` was never called, so there's no text report.
   - Write `package.json` as `{`. Then `json: true` returns 1, stdout gets nothing, and stderr is non-empty.
 
-- [ ] **Step 2: Run** `pnpm vitest run src/commands/doctor.test.ts`. Expected: FAIL.
+- [x] **Step 2: Run** `pnpm vitest run src/commands/doctor.test.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Implement.** With `json`, skip `reportComparisons` and the text lines, and write `JSON.stringify(document, null, 2) + '\n'` to `process.stdout`. Add `.option('--json', 'Print one JSON document for scripts and agents')` in `index.ts`. Docs: a README example, AGENTS.md's doctor bullet and a CHANGELOG Added bullet.
+- [x] **Step 3: Implement.** With `json`, skip `reportComparisons` and the text lines, and write `JSON.stringify(document, null, 2) + '\n'` to `process.stdout`. Add `.option('--json', 'Print one JSON document for scripts and agents')` in `index.ts`. Docs: a README example, AGENTS.md's doctor bullet and a CHANGELOG Added bullet.
 
-- [ ] **Step 4: Run the full gate and a real-project check.** Run the shell steps in Git Bash:
+- [x] **Step 4: Run the full gate and a real-project check.** Run the shell steps in Git Bash:
 
 ```bash
 pnpm test && pnpm run typecheck && pnpm run lint:strict && pnpm run build
@@ -269,7 +269,7 @@ node <repo>/bin/index.js doctor --pm npm --json; echo "doctor exit $?"
 
 Commander wiring needs no extra harness. In the same scratch copy, `node <repo>/bin/index.js update --keep` (no value) must exit non-zero with Commander's missing-argument error. The pasted `next` command with two `--keep` values already proves that repeated flags reach update.
 
-- [ ] **Step 5: Review the diff.** Commit only on Atharv's explicit request after full lint, typecheck and tests pass. Suggested commands for that later request:
+- [x] **Step 5: Review the diff.** Commit only on Atharv's explicit request after full lint, typecheck and tests pass. Suggested commands for that later request:
 
 ```bash
 git add src/commands/doctor.ts src/commands/doctor.test.ts src/index.ts README.md AGENTS.md CHANGELOG.md

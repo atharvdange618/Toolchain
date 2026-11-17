@@ -24,6 +24,7 @@ const { doctor } = await import('./doctor.js');
 
 let dir: string;
 let stdout: MockInstance<typeof console.log>;
+let stdoutWrite: MockInstance<typeof process.stdout.write>;
 let stderr: MockInstance<typeof process.stderr.write>;
 
 function output(): string {
@@ -61,13 +62,14 @@ function files(root = dir): Record<string, string> {
 beforeEach(async () => {
   dir = mkdtempSync(path.join(tmpdir(), 'toolchain-doctor-'));
   writeJson('package.json', { name: 'demo' });
-  vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+  stdoutWrite = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
   stdout = vi.spyOn(console, 'log').mockImplementation(() => {});
   stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   await init({ pm: 'pnpm', targetDir: dir, yes: true });
   vi.mocked(execSync).mockClear();
   vi.mocked(getToolchainDeps).mockClear();
   stdout.mockClear();
+  stdoutWrite.mockClear();
 });
 
 afterEach(() => {
@@ -282,5 +284,72 @@ describe('doctor', () => {
     const exit = vi.spyOn(process, 'exit');
     expect(doctor({ pm: 'pnpm' })).toBe(0);
     expect(exit).not.toHaveBeenCalled();
+  });
+});
+
+describe('doctor --json', () => {
+  function written(): string {
+    return stdoutWrite.mock.calls.map(([chunk]) => String(chunk)).join('');
+  }
+
+  function document(): Record<string, unknown> & { rows: Record<string, unknown>[] } {
+    return JSON.parse(written()) as Record<string, unknown> & { rows: Record<string, unknown>[] };
+  }
+
+  it('prints one parseable document for a fresh init', () => {
+    expect(doctor({ targetDir: dir, pm: 'pnpm', json: true })).toBe(0);
+    const result = document();
+    expect(Object.keys(result)).toEqual(['manifest', 'needsAction', 'next', 'rows']);
+    expect(result).toMatchObject({ manifest: true, needsAction: false, next: null });
+    expect(result.rows.length).toBeGreaterThan(0);
+    for (const row of result.rows) {
+      expect(Object.keys(row)).toEqual([
+        'path',
+        'state',
+        'disk',
+        'want',
+        'needsAction',
+        'stricter',
+      ]);
+      expect(row['disk'] === null || typeof row['disk'] === 'string').toBe(true);
+      expect(row['want'] === null || typeof row['want'] === 'string').toBe(true);
+    }
+    expect(written().endsWith('}\n')).toBe(true);
+    expect(stdout).not.toHaveBeenCalled();
+  });
+
+  it('reports rows, the next command and the manifest flag without a text report', () => {
+    rmSync(path.join(dir, '.toolchain.json'));
+    const config = json('.oxlintrc.json');
+    (config['rules'] as Record<string, unknown>)['import/no-cycle'] = 'error';
+    writeJson('.oxlintrc.json', config);
+    writeFileSync(path.join(dir, '.prettierrc'), 'custom\n');
+    expect(doctor({ targetDir: dir, pm: 'pnpm', json: true })).toBe(1);
+    const result = document();
+    expect(result).toMatchObject({
+      manifest: false,
+      needsAction: true,
+      next: "pnpm dlx @atharvdange/toolchain update --pm pnpm --keep '.prettierrc'",
+    });
+    const find = (entryPath: string) => result.rows.find((row) => row['path'] === entryPath);
+    expect(find('.oxlintrc.json#rules.import/no-cycle')).toMatchObject({
+      state: 'local-edit',
+      stricter: true,
+      needsAction: false,
+    });
+    expect(find('.prettierrc')).toMatchObject({
+      state: 'unknown-origin',
+      disk: 'custom\n',
+      needsAction: true,
+    });
+    expect(stdout).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing to stdout when input is invalid', () => {
+    writeFileSync(path.join(dir, 'package.json'), '{');
+    expect(doctor({ targetDir: dir, pm: 'pnpm', json: true })).toBe(1);
+    expect(written()).toBe('');
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('package.json: invalid JSON'));
   });
 });

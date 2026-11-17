@@ -82,9 +82,12 @@ pnpm dlx @atharvdange/toolchain init --pm bun
 ```bash
 pnpm dlx @atharvdange/toolchain doctor
 pnpm dlx @atharvdange/toolchain doctor --pm pnpm
+pnpm dlx @atharvdange/toolchain doctor --json
 ```
 
 `doctor` compares the current generators, disk and `.toolchain.json` without writes, registry lookups, installs or Husky setup. It shows changes by file and entry, with `- disk` and `+ want` lines. When something needs action or the project has no manifest, it ends with a `Next:` line holding the `update` command to run, with a `--keep` for every conflicting or unknown-origin entry; swap any of them for `--overwrite` to take the generated value.
+
+`--json` prints one JSON document to stdout instead of the report, for scripts and agents: `manifest`, `needsAction`, `next` (the same command, or `null`) and `rows`. Each row has `path`, `state`, `disk` and `want` (the entry's content, or `null` when absent), `needsAction`, and `stricter` (a rule set stricter than generated). The exit codes stay the same. Errors go to stderr and leave stdout empty.
 
 Both commands resolve the package manager from `--pm`, then the project itself (a lockfile or `devEngines`), then the value recorded in `.toolchain.json`, then npm. The package manager that ran the CLI does not count, so `pnpm dlx @atharvdange/toolchain doctor` checks an npm project against its own hooks instead of reporting them stale.
 
