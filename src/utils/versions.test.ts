@@ -49,10 +49,24 @@ describe('getVersions', () => {
     '{"dist-tags":{"latest":"1.0.0"},"time":[]}',
     '{"dist-tags":{"latest":"1.0.0"},"time":{"1.0.0":7}}',
     '{"dist-tags":{"latest":"1.0.0"},"time":{"1.0.0":"bad date"}}',
+    `[${npmView('1.0.0')},${npmView('2.0.0')}]`,
   ])('rejects malformed registry metadata: %s', async (stdout) => {
     const { getVersions } = await import('./versions.js');
     mockedRunCommand.mockResolvedValue({ stdout });
     await expect(getVersions(['husky'])).rejects.toThrow('Could not resolve');
+  });
+
+  // npm 12 wraps `npm view --json` output in a one-element array (#15).
+  it('reads npm 12 metadata wrapped in a one-element array', async () => {
+    const { getVersions } = await import('./versions.js');
+    mockedRunCommand.mockResolvedValue({ stdout: `[${npmView('1.2.3')}]` });
+    await expect(getVersions(['husky'])).resolves.toEqual({ husky: '^1.2.3' });
+  });
+
+  it('names the underlying reason in the lookup error', async () => {
+    const { getVersions } = await import('./versions.js');
+    mockedRunCommand.mockResolvedValue({ stdout: '{}' });
+    await expect(getVersions(['husky'])).rejects.toThrow('Invalid npm metadata');
   });
 
   it('starts all lookups before awaiting any result and retries a failed lookup', async () => {
