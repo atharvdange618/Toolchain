@@ -54,6 +54,26 @@ export function isCommandCancelled(error: unknown): error is CommandCancelledErr
 
 const isWindows = process.platform === 'win32';
 
+// One process listener per signal, shared by every running command, so init's
+// concurrent lookups don't each add one and approach Node's limit of 10.
+// SIGHUP (terminal closed) matters on POSIX: detached children would outlive us.
+const BRIDGED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+const activeStops = new Set<() => void>();
+const stopAll = (): void => {
+  for (const stop of activeStops) stop();
+};
+
+function bridgeSignals(stop: () => void): void {
+  if (activeStops.size === 0) for (const name of BRIDGED_SIGNALS) process.on(name, stopAll);
+  activeStops.add(stop);
+}
+
+function unbridgeSignals(stop: () => void): void {
+  activeStops.delete(stop);
+  if (activeStops.size === 0)
+    for (const name of BRIDGED_SIGNALS) process.removeListener(name, stopAll);
+}
+
 // Runs one of the CLI's own command strings through the platform shell, so
 // Windows .cmd shims (npm.cmd, pnpm.cmd) resolve. Never pass user input as
 // `command`; pass directories as `cwd`.
@@ -133,13 +153,10 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
       );
     };
 
-    const onSignal = (): void => stop();
-
     const cleanup = (): void => {
       for (const timer of timers) clearTimeout(timer);
       signal?.removeEventListener('abort', stop);
-      process.removeListener('SIGINT', onSignal);
-      process.removeListener('SIGTERM', onSignal);
+      unbridgeSignals(stop);
     };
 
     const finish = (code: number | null = null, exitSignal: NodeJS.Signals | null = null): void => {
@@ -183,7 +200,6 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
     child.on('close', (code, exitSignal) => finish(code, exitSignal));
 
     signal?.addEventListener('abort', stop, { once: true });
-    process.on('SIGINT', onSignal);
-    process.on('SIGTERM', onSignal);
+    bridgeSignals(stop);
   });
 }

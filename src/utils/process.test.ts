@@ -291,6 +291,58 @@ describe('runCommand cancellation', () => {
     }
   }, 15_000);
 
+  it('turns SIGHUP into cancellation, so closing the terminal stops the child', async () => {
+    const others = process.listeners('SIGHUP');
+    process.removeAllListeners('SIGHUP');
+    try {
+      let output = '';
+      const run = runCommand(node('hang.cjs'), {
+        cwd: dir,
+        mode: 'stream',
+        onOutput: (text) => (output += text),
+      });
+
+      await waitFor(() => output.includes('ready'));
+      process.emit('SIGHUP');
+
+      await expect(run).rejects.toBeInstanceOf(CommandCancelledError);
+      expect(process.listenerCount('SIGHUP')).toBe(0);
+    } finally {
+      for (const listener of others) process.on('SIGHUP', listener);
+    }
+  }, 15_000);
+
+  // Init runs seven lookups at once; one listener each would near Node's limit of 10.
+  it('shares one signal listener across concurrent commands', async () => {
+    const others = process.listeners('SIGINT');
+    process.removeAllListeners('SIGINT');
+    try {
+      const outputs = ['', '', ''];
+      const runs = outputs.map((_, index) =>
+        runCommand(node('hang.cjs'), {
+          cwd: dir,
+          mode: 'stream',
+          onOutput: (text) => (outputs[index] += text),
+        }),
+      );
+
+      await waitFor(() => outputs.every((text) => text.includes('ready')));
+      expect(process.listenerCount('SIGINT')).toBe(1);
+      process.emit('SIGINT');
+
+      // Settle all three together: awaiting one at a time leaves the others unhandled.
+      const results = await Promise.allSettled(runs);
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected')
+          expect(result.reason).toBeInstanceOf(CommandCancelledError);
+      }
+      expect(process.listenerCount('SIGINT')).toBe(0);
+    } finally {
+      for (const listener of others) process.on('SIGINT', listener);
+    }
+  }, 15_000);
+
   it('removes its signal listeners after a normal finish', async () => {
     const before = process.listenerCount('SIGTERM');
     await runCommand(node('exit.cjs', '0'), { cwd: dir, mode: 'capture' });
