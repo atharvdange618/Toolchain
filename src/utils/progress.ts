@@ -6,8 +6,9 @@ import path from 'node:path';
 import { finished } from 'node:stream/promises';
 import { stripVTControlCharacters } from 'node:util';
 
-import { error, info, step, success, warn } from './logger.js';
+import { error, info, step, success, useTerminalOutput, warn } from './logger.js';
 import {
+  bridgeSignals,
   CommandCancelledError,
   isCommandCancelled,
   type OutputStream,
@@ -20,10 +21,6 @@ export interface TaskOptions {
   successMessage: string;
   interactive?: boolean;
   signal?: AbortSignal;
-}
-
-function terminalProgress(): boolean {
-  return process.stdin.isTTY === true && process.stdout.isTTY === true && !clack.isCI();
 }
 
 // Clack's spinner puts stdin in raw mode to hide typing and, on Windows, never
@@ -43,11 +40,10 @@ export async function withProgress<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const abort = (): void => controller.abort();
-  const spinner = terminalProgress()
+  const spinner = useTerminalOutput()
     ? clack.spinner({ signal: controller.signal, onCancel: abort })
     : undefined;
-  process.on('SIGINT', abort);
-  process.on('SIGTERM', abort);
+  const stopBridging = bridgeSignals(abort);
   try {
     if (spinner) {
       spinner.start(title);
@@ -64,20 +60,19 @@ export async function withProgress<T>(
       if (spinner) {
         if (isCommandCancelled(failure)) spinner.cancel(message);
         else spinner.error(message);
-      } else error(message);
+      } else if (isCommandCancelled(failure)) warn(message);
     }
     throw failure;
   } finally {
     if (spinner) restoreCookedStdin();
-    process.removeListener('SIGINT', abort);
-    process.removeListener('SIGTERM', abort);
+    stopBridging();
   }
 }
 
 export async function runTask(command: string, options: TaskOptions): Promise<void> {
   const { cwd, title, successMessage, interactive, signal } = options;
   if (signal?.aborted) throw new CommandCancelledError(command);
-  if (interactive || !terminalProgress()) {
+  if (interactive || !useTerminalOutput()) {
     step(title);
     await runCommand(command, {
       cwd,

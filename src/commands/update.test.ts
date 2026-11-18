@@ -185,9 +185,9 @@ describe('update decisions and adoption', () => {
     conflict('.husky/pre-commit');
     const before = files();
     select.mockResolvedValueOnce('overwrite').mockResolvedValueOnce(clack.CANCEL_SYMBOL);
-    expect(await run(false)).toBe(1);
+    expect(await run(false)).toBe(130);
     expect(files()).toEqual(before);
-    expect(stderr()).toContain('cancelled');
+    expect(stdout()).toContain('Update cancelled. No files were changed.');
     expect(runTask).not.toHaveBeenCalled();
   });
 
@@ -565,7 +565,8 @@ describe('dependency restoration and recovery', () => {
     stale();
     const before = files();
     vi.mocked(getToolchainDeps).mockRejectedValueOnce(new CommandCancelledError('npm view husky'));
-    expect(await run()).toBe(1);
+    expect(await run()).toBe(130);
+    expect(stderr()).not.toContain('Cancelled: npm view husky');
     expect(files()).toEqual(before);
     expect(runTask).not.toHaveBeenCalled();
     expect(stdout()).not.toContain('Toolchain update complete');

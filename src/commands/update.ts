@@ -169,6 +169,7 @@ export async function update(options: {
     outro('Toolchain update complete.');
     return 0;
   } catch (error_) {
+    if (isCommandCancelled(error_)) return 130;
     error(error_ instanceof Error ? error_.message : String(error_));
     return 1;
   }

@@ -21,7 +21,7 @@ export interface CommandResult {
 export const CAPTURE_LIMIT_BYTES = 1024 * 1024;
 // How long a cancelled command gets after SIGTERM before SIGKILL (POSIX).
 // Windows uses taskkill /F, which does not wait.
-export const KILL_GRACE_MS = 2000;
+const KILL_GRACE_MS = 2000;
 // After SIGKILL, settle even if a stray descendant still holds a pipe open.
 const SETTLE_AFTER_KILL_MS = 1000;
 
@@ -63,15 +63,14 @@ const stopAll = (): void => {
   for (const stop of activeStops) stop();
 };
 
-function bridgeSignals(stop: () => void): void {
+export function bridgeSignals(stop: () => void): () => void {
   if (activeStops.size === 0) for (const name of BRIDGED_SIGNALS) process.on(name, stopAll);
   activeStops.add(stop);
-}
-
-function unbridgeSignals(stop: () => void): void {
-  activeStops.delete(stop);
-  if (activeStops.size === 0)
-    for (const name of BRIDGED_SIGNALS) process.removeListener(name, stopAll);
+  return () => {
+    activeStops.delete(stop);
+    if (activeStops.size === 0)
+      for (const name of BRIDGED_SIGNALS) process.removeListener(name, stopAll);
+  };
 }
 
 // Runs one of the CLI's own command strings through the platform shell, so
@@ -137,26 +136,10 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
       }
     };
 
-    const stop = (): void => {
-      if (settled || cancelled) return;
-      cancelled = true;
-      killTree('SIGTERM');
-      if (isWindows) {
-        timers.push(setTimeout(() => finish(), SETTLE_AFTER_KILL_MS));
-        return;
-      }
-      timers.push(
-        setTimeout(() => {
-          killTree('SIGKILL');
-          timers.push(setTimeout(() => finish(), SETTLE_AFTER_KILL_MS));
-        }, KILL_GRACE_MS),
-      );
-    };
-
     const cleanup = (): void => {
       for (const timer of timers) clearTimeout(timer);
       signal?.removeEventListener('abort', stop);
-      unbridgeSignals(stop);
+      stopBridging();
     };
 
     const finish = (code: number | null = null, exitSignal: NodeJS.Signals | null = null): void => {
@@ -172,6 +155,28 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
       else reject(new CommandFailedError(command, code, exitSignal));
     };
 
+    const forceKill = (): void => {
+      killTree('SIGKILL');
+      timers.push(
+        setTimeout(() => {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          child.unref();
+          finish();
+        }, SETTLE_AFTER_KILL_MS),
+      );
+    };
+
+    const stop = (): void => {
+      if (settled || cancelled || overflow) return;
+      cancelled = true;
+      if (isWindows) forceKill();
+      else {
+        killTree('SIGTERM');
+        timers.push(setTimeout(forceKill, KILL_GRACE_MS));
+      }
+    };
+
     for (const stream of ['stdout', 'stderr'] as const) {
       child[stream]?.on('data', (chunk: Buffer) => {
         if (settled) return;
@@ -180,7 +185,7 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
           if (capturedBytes > CAPTURE_LIMIT_BYTES) {
             if (!overflow) {
               overflow = true;
-              killTree('SIGKILL');
+              forceKill();
             }
             return;
           }
@@ -200,6 +205,6 @@ export function runCommand(command: string, options: CommandOptions): Promise<Co
     child.on('close', (code, exitSignal) => finish(code, exitSignal));
 
     signal?.addEventListener('abort', stop, { once: true });
-    bridgeSignals(stop);
+    const stopBridging = bridgeSignals(stop);
   });
 }

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
+import { CommandCancelledError } from '../utils/process.js';
 import { init } from './init.js';
 import { scaffold } from './scaffold.js';
 
@@ -64,16 +65,21 @@ describe('init interaction', () => {
     expect(existsSync(path.join(dir, '.husky', 'pre-commit'))).toBe(true);
   });
 
-  it.each([false, clack.CANCEL_SYMBOL] as const)(
-    'aborts on %s before writes or registry lookups',
-    async (answer) => {
-      vi.mocked(clack.confirm).mockResolvedValue(answer);
-      await init({ pm: 'pnpm' });
-      expect(readdirSync(dir)).toEqual(['package.json']);
-      expect(getToolchainDeps).not.toHaveBeenCalled();
-      expect(runTask).not.toHaveBeenCalled();
-    },
-  );
+  it('allows declining setup without an error or any writes', async () => {
+    vi.mocked(clack.confirm).mockResolvedValue(false);
+    await expect(init({ pm: 'pnpm' })).resolves.toBeUndefined();
+    expect(readdirSync(dir)).toEqual(['package.json']);
+    expect(getToolchainDeps).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+  });
+
+  it('reports prompt cancellation before writes or registry lookups', async () => {
+    vi.mocked(clack.confirm).mockResolvedValue(clack.CANCEL_SYMBOL);
+    await expect(init({ pm: 'pnpm' })).rejects.toBeInstanceOf(CommandCancelledError);
+    expect(readdirSync(dir)).toEqual(['package.json']);
+    expect(getToolchainDeps).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+  });
 
   it('accepts confirmation and generates the setup', async () => {
     await init({ pm: 'pnpm' });
@@ -109,7 +115,7 @@ describe('init interaction', () => {
 describe('scaffold interaction', () => {
   it('cancels template selection without creating a directory', async () => {
     vi.mocked(clack.select).mockResolvedValue(clack.CANCEL_SYMBOL);
-    await scaffold('demo', { pm: 'pnpm' });
+    await expect(scaffold('demo', { pm: 'pnpm' })).rejects.toBeInstanceOf(CommandCancelledError);
     expect(existsSync(path.join(dir, 'demo'))).toBe(false);
     expect(runTask).not.toHaveBeenCalled();
   });

@@ -11,9 +11,12 @@ import {
 import type { Comparison } from '../manifest/classify.js';
 import type { Choice } from '../manifest/decide.js';
 import { reportComparisons } from '../manifest/report.js';
+import { warn } from '../utils/logger.js';
+import { CommandCancelledError } from '../utils/process.js';
 
 function onCancel(): never {
-  throw new Error('Update cancelled. No files were changed.');
+  warn('Update cancelled. No files were changed.');
+  throw new CommandCancelledError('Choose update changes');
 }
 
 // `flags` holds the whole invocation, including choices for the other pass,
@@ -90,7 +93,6 @@ export async function chooseConflicts(
           initialValue: 'keep',
         });
         if (isCancel(entryChoice)) onCancel();
-        if (entryChoice !== 'keep' && entryChoice !== 'overwrite') onCancel();
         choices.set(row.path, entryChoice);
       }
     } else onCancel();

@@ -117,18 +117,21 @@ describe('withProgress', () => {
     expect(stripVTControlCharacters(output)).toContain('failed');
   });
 
-  it('passes cancellation to work and rejects without a later success', async () => {
-    const count = process.listenerCount('SIGINT');
-    await expect(
-      withProgress('Resolving', 'Resolving done', (signal) => {
-        process.emit('SIGINT');
-        expect(signal.aborted).toBe(true);
-        return Promise.resolve('ignored cancellation');
-      }),
-    ).rejects.toBeInstanceOf(CommandCancelledError);
-    expect(process.listenerCount('SIGINT')).toBe(count);
-    expect(stripVTControlCharacters(output).match(/cancel/gi)).toHaveLength(1);
-  });
+  it.each(['SIGINT', 'SIGHUP'] as const)(
+    'passes %s to work and rejects without a later success',
+    async (name) => {
+      const count = process.listenerCount(name);
+      await expect(
+        withProgress('Resolving', 'Resolving done', (signal) => {
+          process.emit(name);
+          expect(signal.aborted).toBe(true);
+          return Promise.resolve('ignored cancellation');
+        }),
+      ).rejects.toBeInstanceOf(CommandCancelledError);
+      expect(process.listenerCount(name)).toBe(count);
+      expect(stripVTControlCharacters(output).match(/cancel/gi)).toHaveLength(1);
+    },
+  );
 
   it('lets work pass cancellation to the real subprocess runner', async () => {
     await fs.writeFile(path.join(dir, 'wait.cjs'), 'setInterval(()=>{},1000);');

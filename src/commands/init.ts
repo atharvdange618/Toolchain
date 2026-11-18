@@ -19,7 +19,7 @@ import { trackedEntries, validatePackageJson } from '../manifest/project.js';
 import { writeManifest } from '../manifest/write.js';
 import { readJson } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
-import { isCommandCancelled } from '../utils/process.js';
+import { CommandCancelledError, isCommandCancelled } from '../utils/process.js';
 import { runTask, withProgress } from '../utils/progress.js';
 import { getToolchainDeps } from '../utils/versions.js';
 
@@ -127,7 +127,11 @@ export async function init(options: {
       initialValue: true,
       message: `Proceed with toolchain setup for ${projectInfo.framework} project?`,
     });
-    if (isCancel(proceed) || !proceed) {
+    if (isCancel(proceed)) {
+      warn('Setup cancelled. No files were changed.');
+      throw new CommandCancelledError('Confirm setup');
+    }
+    if (!proceed) {
       warn('Aborted by user.');
       return;
     }

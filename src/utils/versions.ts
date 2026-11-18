@@ -89,7 +89,6 @@ function compareVersions(a: string, b: string): number {
 }
 
 async function toRange(pkg: string, signal?: AbortSignal): Promise<string> {
-  if (signal?.aborted) throw new CommandCancelledError(`npm view ${pkg}`);
   const cached = VERSION_CACHE.get(pkg);
   if (cached !== undefined) return `^${cached}`;
   try {

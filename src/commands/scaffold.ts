@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { isCancel, select } from '@clack/prompts';
 
-import { type PackageManager, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
+import { type PackageManager, pmDlx, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
 import { generateExpress } from '../generators/templates/express.js';
 import {
   TEMPLATE_DESCRIPTIONS,
@@ -18,7 +18,7 @@ import { generateReact } from '../generators/templates/react.js';
 import { generateTurbo } from '../generators/templates/turbo.js';
 import { writeFile } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
-import { isCommandCancelled } from '../utils/process.js';
+import { CommandCancelledError, isCommandCancelled } from '../utils/process.js';
 import { runTask, withProgress } from '../utils/progress.js';
 import { init } from './init.js';
 
@@ -99,8 +99,8 @@ export async function scaffold(
       message: 'Select a project template:',
     });
     if (isCancel(selected)) {
-      warn('Aborted by user.');
-      return;
+      warn('Scaffold cancelled. No files were changed.');
+      throw new CommandCancelledError('Select a project template');
     }
     template = selected;
   }
@@ -155,8 +155,16 @@ export async function scaffold(
 
   if (result.scaffold) {
     // CLI-based template (react, nextjs): the external tool creates the project.
-    // Any failure or cancellation stops here, before git, init or cleanup.
-    await result.scaffold(ctx);
+    try {
+      await result.scaffold(ctx);
+    } catch (failure) {
+      if (existsSync(targetDir)) {
+        warn(`Move "${targetDir}" aside before retrying scaffold, or choose a new project name.`);
+      } else if (isCommandCancelled(failure)) {
+        warn('Scaffold cancelled. Rerun the same command to try again.');
+      }
+      throw failure;
+    }
   } else {
     // File-based template - create directory and write files ourselves
     step(`Creating ${template} project files...`);
@@ -184,6 +192,7 @@ export async function scaffold(
       'Initializing git repository',
       'Git repository initialized',
       'Failed to initialize git repository. You can run "git init" manually.',
+      `In "${targetDir}", run "git init" and then "${pmDlx(pm)} @atharvdange/toolchain init --yes --pm ${pm}".`,
     );
   }
 
@@ -222,13 +231,13 @@ async function warnOnFailure(
   title: string,
   successMessage: string,
   failure: string,
-  cancelRetry?: string,
+  cancelRetry: string,
 ): Promise<void> {
   try {
     await runTask(command, { cwd, title, successMessage });
   } catch (error_) {
     if (isCommandCancelled(error_)) {
-      if (cancelRetry) warn(cancelRetry);
+      warn(cancelRetry);
       throw error_;
     }
     warn(failure);

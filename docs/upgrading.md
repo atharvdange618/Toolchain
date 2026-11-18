@@ -4,6 +4,8 @@ Full notes for every release are in [CHANGELOG.md](../CHANGELOG.md).
 
 ## From 2.2
 
+Upgrade to Node.js 20.12.0 or later before running the new CLI.
+
 `update` removes the `commit` script and `config.commitizen` if you never changed them. It leaves dependencies alone, so uninstall the prompt yourself:
 
 ```bash

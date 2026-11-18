@@ -46,7 +46,9 @@ src/
 │   └── write.ts                # Prepared mutations, backups and atomic writes
 └── utils/
     ├── fs.ts                   # readJson, writeFile (creates parent dirs), shared read helpers
-    ├── logger.ts               # Colored output with picocolors
+    ├── logger.ts               # Clack terminal messages and static output for scripts
+    ├── process.ts              # Async commands, signal handling and bounded capture
+    ├── progress.ts             # Terminal progress and task logs
     └── versions.ts             # Resolves dependency versions from the npm registry
 scripts/
 └── smoke.sh                    # Packs the CLI and scaffolds every template from the tarball
@@ -56,7 +58,7 @@ scripts/
 
 ### `src/index.ts`
 
-Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--pm`, `--yes`), `doctor` (`--pm`) and `update` (`--yes`, `--pm`). Doctor and update return codes set `process.exitCode`. Reads the version from `package.json` at runtime. Uses `parseAsync`, so a rejected action prints one line instead of a stack trace.
+Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--pm`, `--yes`), `doctor` (`--pm`) and `update` (`--yes`, `--pm`). Doctor and update return codes set `process.exitCode`. Reads the version from `package.json` at runtime. Uses `parseAsync` to report rejected actions. A cancellation exits 130.
 
 ### `src/commands/init.ts`
 
@@ -151,6 +153,12 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 ### `src/generators/tsconfig.ts`
 
 Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). There is no monorepo variant: `init` writes no root tsconfig in a monorepo that lacks one, and the monorepo templates write their own solution-style root config. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
+
+### `src/utils/process.ts` and `src/utils/progress.ts`
+
+- `runCommand` runs the CLI's own command strings in capture, stream, or inherited-terminal mode. It caps captured stdout at 1 MiB and shares signal listeners across running commands. Pass user directory paths as `cwd`.
+- `withProgress` wraps registry lookups. `runTask` streams output off a terminal and shows compact Clack output on a terminal, with the full log path on failures or when it truncates diagnostics. Interactive tasks inherit the terminal.
+- `@clack/prompts` is pinned because the spinner needs a workaround for raw stdin on Windows. Verify Ctrl+C in a real Windows terminal when bumping it.
 
 ### `src/utils/versions.ts`
 

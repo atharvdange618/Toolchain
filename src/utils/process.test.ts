@@ -22,6 +22,13 @@ let dir = '';
 
 const FIXTURES: Record<string, string> = {
   'big.cjs': `process.stdout.write('x'.repeat(${CAPTURE_LIMIT_BYTES} + 10));`,
+  'big-with-detached-child.cjs': `
+    const { spawn } = require('node:child_process');
+    spawn(process.execPath, ['-e', 'setTimeout(() => {}, 3200)'], {
+      detached: true,
+      stdio: ['ignore', 'ignore', 'inherit'],
+    }).unref();
+    process.stdout.write('x'.repeat(${CAPTURE_LIMIT_BYTES} + 10));`,
   'delayed.cjs': `setTimeout(() => process.stdout.write('done'), 400);`,
   'exit.cjs': `process.exit(Number(process.argv[2]));`,
   'hang.cjs': `process.stdout.write('ready\\n'); setInterval(() => {}, 1000);`,
@@ -211,6 +218,17 @@ describe('runCommand', () => {
       /1 MiB/,
     );
   });
+
+  it.skipIf(isWindows)(
+    'rejects overflow while a detached descendant still holds stderr',
+    async () => {
+      const start = Date.now();
+      await expect(
+        runCommand(node('big-with-detached-child.cjs'), { cwd: dir, mode: 'capture' }),
+      ).rejects.toThrow(/1 MiB/);
+      expect(Date.now() - start).toBeLessThan(2600);
+    },
+  );
 
   it('runs commands from inherit mode and resolves with empty stdout', async () => {
     const result = await runCommand(node('exit.cjs', '0'), { cwd: dir, mode: 'inherit' });

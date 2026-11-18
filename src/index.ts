@@ -84,7 +84,7 @@ program
 try {
   await program.parseAsync();
 } catch (error_) {
-  // The task already printed its cancel line; 130 matches Node's own Ctrl+C exit.
+  // Cancellation paths print their own status. 130 matches Node's Ctrl+C exit.
   if (isCommandCancelled(error_)) process.exit(130);
   else {
     error(error_ instanceof Error ? error_.message : String(error_));

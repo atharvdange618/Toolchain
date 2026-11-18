@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -143,9 +143,12 @@ describe('scaffold ordering', () => {
     ['cancelled', new CommandCancelledError('create-vite')],
     ['failed', new Error('exit 1')],
   ])('stops every later phase when the scaffolder is %s', async (_label, failure) => {
-    vi.mocked(runTask).mockImplementation((command) =>
-      command.includes('create-vite') ? Promise.reject(failure) : Promise.resolve(),
-    );
+    const partial = path.join(parent, 'demo', 'package.json');
+    vi.mocked(runTask).mockImplementationOnce(() => {
+      mkdirSync(path.dirname(partial));
+      writeFileSync(partial, '{}');
+      return Promise.reject(failure);
+    });
 
     await expect(scaffold('demo', { pm: 'npm', template: 'react', yes: true })).rejects.toBe(
       failure,
@@ -153,6 +156,8 @@ describe('scaffold ordering', () => {
 
     expect(commands()).toHaveLength(1);
     expect(init).not.toHaveBeenCalled();
+    expect(existsSync(partial)).toBe(true);
+    expect(output.join('')).toContain(`Move "${path.dirname(partial)}" aside`);
     expect(output.join('')).not.toContain('is ready!');
   });
 });
@@ -204,6 +209,7 @@ describe('scaffold cleanup', () => {
 
   // After init the project works; only the cleanup of generated files is left.
   it.each([
+    ['git init', 'run "git init" and then "npx --yes @atharvdange/toolchain init --yes --pm npm"'],
     ['npm run lint:fix', 'Run "npm run lint:fix" and "npm run format" manually to finish setup.'],
     ['npm run format', 'Run "npm run format" manually to finish setup.'],
   ])('names the remaining steps when %s is cancelled', async (cancelled, retry) => {
