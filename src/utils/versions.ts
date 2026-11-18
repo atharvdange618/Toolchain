@@ -97,7 +97,9 @@ async function toRange(pkg: string, signal?: AbortSignal): Promise<string> {
       mode: 'capture',
       ...(signal ? { signal } : {}),
     });
-    const view: unknown = JSON.parse(stdout);
+    const parsed: unknown = JSON.parse(stdout);
+    // npm 12 wraps the object in a one-element array; npm 11 and earlier don't.
+    const view: unknown = Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
     if (!isObject(view) || !isObject(view['dist-tags']) || !isObject(view['time'])) {
       throw new Error('Invalid npm metadata');
     }
@@ -118,8 +120,9 @@ async function toRange(pkg: string, signal?: AbortSignal): Promise<string> {
     return `^${version}`;
   } catch (failure) {
     if (isCommandCancelled(failure)) throw failure;
+    const reason = failure instanceof Error ? failure.message : String(failure);
     throw new Error(
-      `Could not resolve the latest version of "${pkg}" from npm. Check your network connection and try again.`,
+      `Could not resolve the latest version of "${pkg}" from npm (${reason}). Check your network connection and try again.`,
       { cause: failure },
     );
   }
