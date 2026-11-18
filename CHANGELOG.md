@@ -13,6 +13,10 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 - The interactive commit prompt: the `commit` script, `config.commitizen`, and the `commitizen` and `@commitlint/cz-commitlint` devDependencies. Every `commitizen` release pins `glob@7.2.3`, so each npm install printed deprecation warnings for `glob` and `inflight` (#10). The `commit-msg` hook still enforces the format. `update` removes the script and config when unedited; see [Upgrading](docs/upgrading.md#from-22) to remove the packages.
 
+### Fixed
+
+- `init` and `scaffold` failed on npm 12 with "Could not resolve the latest version ... Check your network connection", although the registry answered. npm 12 wraps `npm view --json` output in a one-element array, and the version lookup rejected arrays. It now reads the object inside, and the error names the underlying reason, so a parse failure no longer reads as a network problem. ([#15](https://github.com/atharvdange618/toolchain/issues/15))
+
 ## [2.2.0] - 2026-11-17
 
 ### Added
