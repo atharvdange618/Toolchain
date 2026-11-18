@@ -187,7 +187,7 @@ This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.hu
 
 The repo's `.toolchain.json` was adopted through the built update command after comparing generator bytes. Keep it with generator changes and check doctor afterward. Smoke runs doctor with an explicit per-case package manager after lint/typecheck/format/build, recording `logs/doctor.log`; the explicit manager prevents the parent pnpm environment from selecting hooks for an npm case.
 
-CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
+CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. Its `node-floor` job builds on 22, then installs the packed CLI with `--engine-strict` on exactly Node 20.12.0 and runs `doctor` and `init` there, since the test job's Node 20 is the newest 20.x and Vitest and pnpm aren't checked at the floor. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
 Entry point: `bin/index.js` imports `dist/index.js`, built from `src/index.ts`.
 
