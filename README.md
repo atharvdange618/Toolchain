@@ -107,6 +107,7 @@ Every script, tsconfig option and lint rule, and why each one is there: [docs/co
 - [Upgrading from v1 or 2.x](docs/upgrading.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Author
 
