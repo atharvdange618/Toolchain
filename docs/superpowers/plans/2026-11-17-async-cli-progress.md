@@ -126,11 +126,11 @@ Each item has an owning test task below:
 
 **Files:** create `src/utils/process.ts`, `src/utils/process.test.ts`.
 
-- [ ] Write failing tests using real `process.execPath -e` fixtures where possible: stdout and stderr separation, delayed final stderr before close, nonzero status, launch failure, pre-aborted signal, delayed output while a parent timer still runs, split UTF-8, and capture overflow.
-- [ ] Add a fixture that starts a descendant which writes a delayed marker. Abort its parent task and assert the descendant exits and the marker never appears. Run the tree test on Windows and POSIX; do not replace it with an assertion that `kill()` was called. Add an `inherit`-mode test asserting the child is not detached.
-- [ ] Run `pnpm exec vitest run src/utils/process.test.ts` and record the expected failures.
-- [ ] Implement the interface above with one settled result and cleaned listeners. Keep platform details here. Use a bounded grace period followed by forced cleanup; specify and test the chosen duration in the implementation.
-- [ ] Verify the tests pass, including a command in a directory with spaces. Add a Windows `.cmd` fixture test; keep platform skips explicit.
+- [x] Write failing tests using real `process.execPath -e` fixtures where possible: stdout and stderr separation, delayed final stderr before close, nonzero status, launch failure, pre-aborted signal, delayed output while a parent timer still runs, split UTF-8, and capture overflow.
+- [x] Add a fixture that starts a descendant which writes a delayed marker. Abort its parent task and assert the descendant exits and the marker never appears. Run the tree test on Windows and POSIX; do not replace it with an assertion that `kill()` was called. Add an `inherit`-mode test asserting the child is not detached.
+- [x] Run `pnpm exec vitest run src/utils/process.test.ts` and record the expected failures.
+- [x] Implement the interface above with one settled result and cleaned listeners. Keep platform details here. Use a bounded grace period followed by forced cleanup; specify and test the chosen duration in the implementation.
+- [x] Verify the tests pass, including a command in a directory with spaces. Add a Windows `.cmd` fixture test; keep platform skips explicit.
 
 ## Task 2: Terminal progress and compact logs
 
@@ -200,22 +200,42 @@ Each item has an owning test task below:
 
 **Interfaces:** `TemplateResult.scaffold?: (ctx: TemplateContext) => Promise<void>`; generator registry accepts `TemplateResult | Promise<TemplateResult>` and scaffold awaits it. Do not force pure `generatePlain`, `generateReact` or `generateNextjs` factories to become async just to match the registry.
 
-- [ ] Add failing tests that a delayed external scaffolder finishes before Git/init/format, and that scaffolder cancellation/error prevents every subsequent phase and final success.
+- [x] Add failing tests that a delayed external scaffolder finishes before Git/init/format, and that scaffolder cancellation/error prevents every subsequent phase and final success.
 - [x] Make registry-backed Express/pnpm-monorepo/Turbo generators async. Resolve the Node types version once per monorepo generation, then pass it into synchronous `generateMonorepoPackageFiles(devScript, typesNodeVersion)` and its package-json helper. Keep generated strings unchanged.
-- [ ] Await external React/Next scaffolder callbacks. Apply the React flags specified above; update the existing test which currently expects prompts without outer `--yes`. Preserve Next.js `--yes`/TypeScript/App Router choices and interactive behavior.
-- [ ] Await Git initialization and cleanup commands through the task helper. Retain the existing warning-and-continue behavior for ordinary Git/lint/format failures. Treat cancellation separately so it stops the command; never print "ready" after cancellation.
-- [ ] Update template tests and version mocks to promises where required. Keep the existing real TypeScript compile check; synchronous subprocesses used only in tests do not need migration.
-- [ ] Run `pnpm exec vitest run src/commands/scaffold.test.ts src/commands/interaction.test.ts src/generators/templates/scaffolders.test.ts src/generators/templates/templates.test.ts`; verify deferred ordering, exact flags, monorepo content, paths with spaces and both interactive/noninteractive modes.
+- [x] Await external React/Next scaffolder callbacks. Apply the React flags specified above; update the existing test which currently expects prompts without outer `--yes`. Preserve Next.js `--yes`/TypeScript/App Router choices and interactive behavior.
+- [x] Await Git initialization and cleanup commands through the task helper. Retain the existing warning-and-continue behavior for ordinary Git/lint/format failures. Treat cancellation separately so it stops the command; never print "ready" after cancellation.
+- [x] Update template tests and version mocks to promises where required. Keep the existing real TypeScript compile check; synchronous subprocesses used only in tests do not need migration.
+- [x] Run `pnpm exec vitest run src/commands/scaffold.test.ts src/commands/interaction.test.ts src/generators/templates/scaffolders.test.ts src/generators/templates/templates.test.ts`; verify deferred ordering, exact flags, monorepo content, paths with spaces and both interactive/noninteractive modes.
+
+### Task 5 execution notes, 2026-11-18
+
+- `TemplateResult.scaffold` returns `Promise<void>`; scaffold awaits it, and any scaffolder failure or cancellation propagates before Git, init or cleanup. The top-level catch prints it.
+- create-vite runs through `runTask` with `--no-immediate --no-interactive` always (flags checked against `create-vite@latest --help` on 2026-11-18). create-next-app gets the spinner under `--yes` and `interactive: true` (inherited terminal, static heading) without it.
+- Git init, lint:fix and format go through one `warnOnFailure` helper in scaffold.ts: ordinary failure warns and continues, cancellation rethrows. No "ready" after cancellation.
+- Ruling: deleted the "Running <template> scaffolding tool" heading and "created by official tooling" line, since `runTask` now prints its own title and success line per tool. Cost if wrong: one less generic line.
+- Tests: deferred create-vite blocks git/init/cleanup; scaffolder cancel and failure stop every later phase; git/lint:fix/format cancellation stops with no ready line; git init failure continues; the scaffolder test uses a parent path with a space.
+- Verification: lint:strict, typecheck, prettier --check src, 676 tests (4 skipped). Uncommitted.
 
 ## Task 6: Whole-change verification and handoff
 
-- [ ] Search `src/commands`, `src/utils/versions.ts`, and template runtime files for `execSync`, `execFileSync` and `spawnSync`. No blocking runtime child calls should remain; synchronous checks confined to tests are fine.
-- [ ] Run `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, formatting checks on changed files, and `pnpm run build`. Run the built doctor in text and JSON modes; parse JSON and check its exit code separately.
+- [x] Search `src/commands`, `src/utils/versions.ts`, and template runtime files for `execSync`, `execFileSync` and `spawnSync`. No blocking runtime child calls should remain; synchronous checks confined to tests are fine.
+- [x] Run `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, formatting checks on changed files, and `pnpm run build`. Run the built doctor in text and JSON modes; parse JSON and check its exit code separately.
 - [ ] In a real Git Bash terminal on Windows, test plain and React scaffold success, interactive Next.js prompt visibility, a deliberately failing child task, redirected logs, and Ctrl+C during a delayed install. Check child/descendant exit and restored terminal cursor. The Codex sandbox terminal previously hung even for plain Node readline; use an actual working terminal for this acceptance check rather than adding speculative stdin workarounds.
-- [ ] From Git Bash, run `bash scripts/smoke.sh plain:npm react:npm nextjs:npm pnpm-monorepo:pnpm turbo:pnpm`. Record each case's independent scaffold/lint/typecheck/format/build/doctor/hook results; then run the full smoke matrix before release. Do not count a missing tool/network failure as a pass.
-- [ ] Check the declared Node 20.12 floor with the packed CLI; do not assume the development test runner supports that exact minimum. Exercise Linux CI as well as Windows shell behavior when available.
-- [ ] Update relevant docs and this checklist with actual results and remaining limits. Request one final whole-change review if the selected execution workflow calls for it.
+- [x] From Git Bash, run `bash scripts/smoke.sh plain:npm react:npm nextjs:npm pnpm-monorepo:pnpm turbo:pnpm`. Record each case's independent scaffold/lint/typecheck/format/build/doctor/hook results; then run the full smoke matrix before release. Do not count a missing tool/network failure as a pass.
+- [x] Check the declared Node 20.12 floor with the packed CLI; do not assume the development test runner supports that exact minimum. Exercise Linux CI as well as Windows shell behavior when available.
+- [x] Update relevant docs and this checklist with actual results and remaining limits. Request one final whole-change review if the selected execution workflow calls for it.
 - [ ] Leave the implementation reviewable. Commit, push, open a PR or publish only when Atharv asks. The plan itself is uncommitted unless separately requested.
+
+### Task 6 execution notes, 2026-11-18
+
+- No `execSync`, `execFileSync` or `spawnSync` remains in runtime code.
+- lint:strict, typecheck, prettier --check, 681 tests (4 skipped), build pass. Built doctor exits 0 in text mode and in `--json` mode, whose stdout parses as one document with empty stderr.
+- Smoke subset (plain:npm, react:npm, nextjs:npm, pnpm-monorepo:pnpm, turbo:pnpm): every case passed scaffold, lint, typecheck, format, build, doctor and both commit hooks. Smoke runs without a terminal, so it covers the static output path only.
+- Final review (fresh reviewer): no Critical or Important findings. Two Minors re-graded and fixed: a cancelled init or scaffold now exits 130 without repeating the cancel line, and init prints the manual install or Husky command first; express, turbo and pnpm-monorepo scaffolds show a "Resolving template versions" spinner and pass its signal to the lookups. Four Minors deferred (see the ledger).
+- Follow-up, same day: the four deferred minors are fixed (log-write failure reports as a failure, SIGHUP is bridged, one shared process listener per signal, `withProgress` takes a separate success message). The three orphaned version helpers are gone. CI's `node-floor` job runs the packed CLI on Node 20.12.0.
+- Real terminal, Windows Git Bash (Atharv): scaffold plain/react/express, a failing install, and redirected output passed first time. Two bugs found and fixed: Clack 1.6.0's spinner leaves stdin raw on Windows, so Ctrl+C never became SIGINT (`withProgress` now restores cooked mode); create-next-app 16 skips its questions when any `--` flag is present (interactive runs now pass none). Rerun passed: Next.js questions appear, Ctrl+C during install prints the retry line and exits 130, Ctrl+C during lint stops before format with no ready line.
+- A scaffold cancelled after init now names what is left: "Run \"<pm> run lint:fix\" and \"<pm> run format\" manually", or only format when format was the step cancelled.
+- Open: the same checks on Linux, including closing the terminal mid-install (SIGHUP). Node 20.12 floor now runs in CI (first run pending). POSIX signal tests have only run in Linux CI. Full smoke matrix must rerun on the final code before release.
 
 ## References
 
