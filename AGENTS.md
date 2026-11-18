@@ -62,7 +62,7 @@ Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--
 
 ### `src/commands/init.ts`
 
-Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, await dependency versions with progress, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; init finishes version lookups before planning or writing, so a failed or cancelled lookup leaves the project untouched.
+Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, await dependency versions with progress, `buildPlan`, print the plan's messages, uninstall removed ESLint packages first (npm with a lockfile only, #11; a failure warns and continues, a cancel stops before init writes any config), move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; init finishes version lookups before planning or writing, so a failed or cancelled lookup leaves the project untouched.
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.

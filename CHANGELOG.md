@@ -15,6 +15,7 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ### Fixed
 
+- `init` no longer prints `ERESOLVE overriding peer dependency` on npm for the ESLint packages it removes. With a `package-lock.json`, it runs `npm uninstall` on them before moving TypeScript to 7, so npm prunes the old typescript-eslint tree before it checks peers. A fresh `create-next-app` project went from 8 warnings to none. ([#11](https://github.com/atharvdange618/toolchain/issues/11))
 - `init` and `scaffold` failed on npm 12 with "Could not resolve the latest version ... Check your network connection", although the registry answered. npm 12 wraps `npm view --json` output in a one-element array, and the version lookup rejected arrays. It now reads the object inside, and the error names the underlying reason, so a parse failure no longer reads as a network problem. ([#15](https://github.com/atharvdange618/toolchain/issues/15))
 
 ## [2.2.0] - 2026-11-17

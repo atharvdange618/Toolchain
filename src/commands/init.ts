@@ -159,6 +159,7 @@ export async function init(options: {
     else info(message.text);
   }
 
+  await uninstallRemovedFirst(targetDir, pm, plan);
   step('Writing config files...');
   moveAside(targetDir, OTHER_COMMITLINT_CONFIGS, 'commitlint.config.mjs');
   moveAside(targetDir, OTHER_ESLINT_CONFIGS, '.oxlintrc.json');
@@ -224,6 +225,42 @@ export async function init(options: {
 function refuseUnsupported(stack: UnsupportedStack): never {
   error(unsupportedMessage(stack));
   return process.exit(1);
+}
+
+// npm builds the new tree from the old lockfile and checks every peer edge
+// before it prunes, so one install that drops ESLint and moves TypeScript to 7
+// prints ERESOLVE for each typescript-eslint package it is about to remove
+// (#11). Uninstalling them while package.json still holds the old TypeScript
+// prunes them first. Only with a lockfile, the case #11 reproduced.
+// ponytail: npm only, the one manager seen printing these; extend if pnpm,
+// yarn or bun turn out to warn the same way.
+async function uninstallRemovedFirst(
+  targetDir: string,
+  pm: PackageManager,
+  plan: Plan,
+): Promise<void> {
+  if (pm !== 'npm' || !existsSync(path.join(targetDir, 'package-lock.json'))) return;
+  const prefix = 'package.json#devDependencies.';
+  const names = plan.entries
+    .filter((entry) => entry.want === null && entry.path.startsWith(prefix))
+    .map((entry) => entry.path.slice(prefix.length));
+  if (names.length === 0) return;
+  const command = `npm uninstall ${names.join(' ')}`;
+  try {
+    await runTask(command, {
+      cwd: targetDir,
+      title: 'Removing ESLint packages',
+      successMessage: 'ESLint packages removed',
+    });
+  } catch (error_) {
+    if (isCommandCancelled(error_)) {
+      warn(
+        'Setup cancelled before init wrote any config files. npm may have changed package.json and package-lock.json. Rerun init to continue.',
+      );
+      throw error_;
+    }
+    warn(`${command} failed; the install below may print ERESOLVE warnings for those packages.`);
+  }
 }
 
 // Renames rather than deletes, so the user keeps any custom rules.
