@@ -182,7 +182,10 @@ export async function init(options: {
       successMessage: 'Dependencies installed',
     });
   } catch (error_) {
-    if (isCommandCancelled(error_)) throw error_;
+    if (isCommandCancelled(error_)) {
+      warn(`Run "${pm} install" manually to finish setup.`);
+      throw error_;
+    }
     error(`Failed to install dependencies with ${pm}. Run "${pm} install" manually.`);
     return process.exit(1);
   }
@@ -194,7 +197,10 @@ export async function init(options: {
       successMessage: 'Husky initialized',
     });
   } catch (error_) {
-    if (isCommandCancelled(error_)) throw error_;
+    if (isCommandCancelled(error_)) {
+      warn(`Run "${pmExec(pm)} husky" manually to finish setup.`);
+      throw error_;
+    }
     error('Failed to initialize Husky. Run "husky" manually.');
     return process.exit(1);
   }

@@ -210,6 +210,17 @@ describe('init manifest', () => {
     expect(runTask).toHaveBeenCalledTimes(1);
     expect(exit).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalledWith(expect.stringContaining('Toolchain is ready'));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Run "pnpm install" manually'));
+  });
+
+  it('names the Husky retry after a cancelled Husky setup', async () => {
+    const failure = new CommandCancelledError('pnpm exec husky');
+    vi.mocked(runTask).mockResolvedValueOnce(undefined).mockRejectedValueOnce(failure);
+    const log = vi.spyOn(process.stdout, 'write');
+
+    await expect(init({ pm: 'pnpm', targetDir: dir, yes: true })).rejects.toBe(failure);
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Run "pnpm exec husky" manually'));
   });
 
   it('reports manifest write failure without installing or announcing readiness', async () => {

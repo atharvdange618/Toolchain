@@ -59,4 +59,22 @@ describe('CLI entry point', () => {
     expect(exit).toHaveBeenCalledWith(1);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining('No package.json found'));
   });
+
+  it('exits 130 on cancellation without repeating the cancel message', async () => {
+    vi.resetModules();
+    const { CommandCancelledError } = await import('./utils/process.js');
+    vi.doMock('./commands/init.js', () => ({
+      init: vi.fn().mockRejectedValue(new CommandCancelledError('pnpm install')),
+    }));
+    vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    process.argv = [process.execPath, 'toolchain', 'init', '--yes'];
+
+    await expect(import('./index.js')).resolves.toBeDefined();
+    vi.doUnmock('./commands/init.js');
+
+    expect(exit).toHaveBeenCalledWith(130);
+    expect(stderr).not.toHaveBeenCalledWith(expect.stringContaining('Cancelled:'));
+  });
 });
