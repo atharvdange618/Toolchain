@@ -83,8 +83,13 @@ export async function runTask(command: string, options: TaskOptions): Promise<vo
   if (signal?.aborted) abort();
   const log = createWriteStream(file, { flags: 'wx' });
   const closed = finished(log, { cleanup: true });
-  // A failed log must stop the child rather than silently lose diagnostics.
-  void closed.catch(abort);
+  // A failed log must stop the child rather than silently lose diagnostics,
+  // and must not read as Ctrl+C to the caller.
+  let logFailure: unknown;
+  void closed.catch((failure: unknown) => {
+    logFailure = failure;
+    abort();
+  });
   const display = clack.taskLog({ title, limit: 40, retainLog: false });
   const warnings: string[] = [];
   let diagnostics = 0;
@@ -183,9 +188,13 @@ export async function runTask(command: string, options: TaskOptions): Promise<vo
     await closed.catch(() => error('Could not save the complete task log'));
     emit('stdout');
     emit('stderr');
-    display.error(`${title} ${isCommandCancelled(failure) ? 'cancelled' : 'failed'}`);
+    const reported =
+      logFailure === undefined
+        ? failure
+        : new Error(`Could not write the task log for: ${command}`, { cause: logFailure });
+    display.error(`${title} ${isCommandCancelled(reported) ? 'cancelled' : 'failed'}`);
     info(`Full log: ${file}`);
-    throw failure;
+    throw reported;
   } finally {
     signal?.removeEventListener('abort', abort);
   }

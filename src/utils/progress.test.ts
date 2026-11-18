@@ -1,13 +1,22 @@
 /* eslint-disable no-control-regex -- These checks distinguish cursor control from ANSI colors. */
+import type { WriteStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { Writable } from 'node:stream';
 import { stripVTControlCharacters } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CommandCancelledError, runCommand } from './process.js';
 import { runTask, withProgress } from './progress.js';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, createWriteStream: vi.fn(actual.createWriteStream) };
+});
+
+const { createWriteStream } = await import('node:fs');
 
 let dir: string;
 let output: string;
@@ -124,6 +133,24 @@ describe('withProgress', () => {
 });
 
 describe('runTask', () => {
+  // A full disk is not Ctrl+C: callers must not print "cancelled" or exit 130.
+  it('reports a failed log write as a failure, not a cancellation', async () => {
+    vi.mocked(createWriteStream).mockImplementationOnce(
+      () =>
+        new Writable({
+          write(_chunk, _encoding, callback) {
+            callback(new Error('ENOSPC: no space left on device'));
+          },
+        }) as unknown as WriteStream,
+    );
+
+    const run = task("console.log('ready'); setInterval(() => {}, 1000);");
+
+    await expect(run).rejects.toThrow(/Could not write the task log/);
+    await expect(run).rejects.not.toBeInstanceOf(CommandCancelledError);
+    expect(stripVTControlCharacters(output + errors)).not.toMatch(/cancelled/i);
+  }, 15_000);
+
   it('collapses ordinary output and removes a clean successful log', async () => {
     const before = await fs.readdir(os.tmpdir());
     await task("console.log('ordinary output');");
