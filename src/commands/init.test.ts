@@ -348,8 +348,14 @@ describe('init removing ESLint packages', () => {
   it('uninstalls them with npm before package.json moves to TypeScript 7', async () => {
     writeProject(true);
     let typescriptDuringUninstall: string | undefined;
+    // Like npm, drop the uninstalled keys, so applyEntries meets them gone.
     vi.mocked(runTask).mockImplementationOnce(() => {
-      typescriptDuringUninstall = devDependencies()['typescript'];
+      const { eslint: _eslint, 'eslint-config-next': _next, ...rest } = devDependencies();
+      typescriptDuringUninstall = rest['typescript'];
+      writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({ devDependencies: rest, name: 'demo' }),
+      );
       return Promise.resolve();
     });
 
@@ -365,20 +371,15 @@ describe('init removing ESLint packages', () => {
     expect(devDependencies()['typescript']).toBe('^7.0.2');
   });
 
-  it('skips the uninstall without a lockfile, where it would install everything twice', async () => {
-    writeProject(false);
+  it.each([
+    ['npm without a lockfile', 'npm', false, ['npm install', 'npm exec -- husky']],
+    ['pnpm', 'pnpm', true, ['pnpm install', 'pnpm exec husky']],
+  ] as const)('skips the uninstall for %s', async (_name, pm, lockfile, expected) => {
+    writeProject(lockfile);
 
-    await init({ pm: 'npm', targetDir: dir, yes: true });
+    await init({ pm, targetDir: dir, yes: true });
 
-    expect(commands()).toEqual(['npm install', 'npm exec -- husky']);
-  });
-
-  it('skips the uninstall for other package managers', async () => {
-    writeProject(true);
-
-    await init({ pm: 'pnpm', targetDir: dir, yes: true });
-
-    expect(commands()).toEqual(['pnpm install', 'pnpm exec husky']);
+    expect(commands()).toEqual(expected);
   });
 
   it('warns and still installs when the uninstall fails', async () => {

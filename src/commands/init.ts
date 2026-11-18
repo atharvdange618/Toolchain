@@ -231,9 +231,7 @@ function refuseUnsupported(stack: UnsupportedStack): never {
 // before it prunes, so one install that drops ESLint and moves TypeScript to 7
 // prints ERESOLVE for each typescript-eslint package it is about to remove
 // (#11). Uninstalling them while package.json still holds the old TypeScript
-// prunes them first. Only with a lockfile: without one, the uninstall would
-// install the whole project once more. A failure costs the warnings, not the
-// setup, so init carries on; a cancel stops before init writes anything.
+// prunes them first. Only with a lockfile, the case #11 reproduced.
 // ponytail: npm only, the one manager seen printing these; extend if pnpm,
 // yarn or bun turn out to warn the same way.
 async function uninstallRemovedFirst(
@@ -257,7 +255,7 @@ async function uninstallRemovedFirst(
   } catch (error_) {
     if (isCommandCancelled(error_)) {
       warn(
-        'Setup cancelled before any config files were written; npm may have removed some ESLint packages. Rerun init to continue.',
+        'Setup cancelled before init wrote any config files. npm may have changed package.json and package-lock.json. Rerun init to continue.',
       );
       throw error_;
     }
