@@ -26,6 +26,16 @@ function terminalProgress(): boolean {
   return process.stdin.isTTY === true && process.stdout.isTTY === true && !clack.isCI();
 }
 
+// Clack's spinner puts stdin in raw mode to hide typing and, on Windows, never
+// turns it off. In raw mode Ctrl+C arrives as a keypress, not SIGINT: on
+// Windows nothing handles it, elsewhere Clack's handler calls process.exit(0)
+// without stopping children. Cooked mode lets Ctrl+C reach the signal path.
+function restoreCookedStdin(): void {
+  if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
+    process.stdin.setRawMode(false);
+  }
+}
+
 export async function withProgress<T>(
   title: string,
   successMessage: string,
@@ -39,8 +49,10 @@ export async function withProgress<T>(
   process.on('SIGINT', abort);
   process.on('SIGTERM', abort);
   try {
-    if (spinner) spinner.start(title);
-    else step(title);
+    if (spinner) {
+      spinner.start(title);
+      restoreCookedStdin();
+    } else step(title);
     const value = await work(controller.signal);
     if (controller.signal.aborted) throw new CommandCancelledError(title);
     if (spinner) spinner.stop(successMessage);
@@ -56,6 +68,7 @@ export async function withProgress<T>(
     }
     throw failure;
   } finally {
+    if (spinner) restoreCookedStdin();
     process.removeListener('SIGINT', abort);
     process.removeListener('SIGTERM', abort);
   }

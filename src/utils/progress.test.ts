@@ -86,6 +86,24 @@ describe('withProgress', () => {
     expect(process.listenerCount('SIGINT')).toBe(count);
   });
 
+  // Clack's spinner sets raw mode and, on Windows, never unsets it. In raw mode
+  // Ctrl+C is a keypress: no SIGINT, or Clack's own handler exits 0.
+  it('keeps stdin out of raw mode during and after the spinner', async () => {
+    const setRawMode = vi.fn();
+    Object.defineProperty(process.stdin, 'setRawMode', { configurable: true, value: setRawMode });
+    try {
+      let during: unknown;
+      await withProgress('Resolving', 'Resolved', () => {
+        during = setRawMode.mock.calls.at(-1)?.[0];
+        return Promise.resolve();
+      });
+      expect(during).toBe(false);
+      expect(setRawMode.mock.calls.at(-1)?.[0]).toBe(false);
+    } finally {
+      Reflect.deleteProperty(process.stdin, 'setRawMode');
+    }
+  });
+
   it.each(['throw', 'reject'])('cleans up a %s without a completion line', async (kind) => {
     const failure = new Error('lookup failed');
     const count = process.listenerCount('SIGINT');
