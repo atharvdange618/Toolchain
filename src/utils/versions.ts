@@ -3,10 +3,6 @@ import { CommandCancelledError, isCommandCancelled, runCommand } from './process
 
 const VERSION_CACHE = new Map<string, string>();
 
-export function getExpressVersion(): Promise<string> {
-  return toRange('express');
-}
-
 export const TOOLCHAIN_DEP_NAMES: readonly string[] = [
   '@commitlint/cli',
   '@commitlint/config-conventional',
@@ -34,21 +30,9 @@ export async function getToolchainDeps(
   return versions;
 }
 
-export function getTurboVersion(): Promise<string> {
-  return toRange('turbo');
-}
-
 export function getTypescriptVersion(): string {
   // oxlint-tsgolint runs on TypeScript 7, so v1's 6.0.x pin is gone.
   return '^7.0.2';
-}
-
-export function getTypesExpressVersion(): Promise<string> {
-  return toRange('@types/express');
-}
-
-export function getTypesNodeVersion(): Promise<string> {
-  return toRange('@types/node');
 }
 
 export async function getVersions(

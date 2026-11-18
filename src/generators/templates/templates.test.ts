@@ -8,11 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeFile } from '../../utils/fs.js';
 
 vi.mock('../../utils/versions.js', () => ({
-  getExpressVersion: vi.fn().mockResolvedValue('^5.0.0'),
-  getTurboVersion: vi.fn().mockResolvedValue('^2.0.0'),
   getTypescriptVersion: vi.fn(() => '^7.0.2'),
-  getTypesExpressVersion: vi.fn().mockResolvedValue('^5.0.0'),
-  getTypesNodeVersion: vi.fn().mockResolvedValue('^22.0.0'),
   getVersions: vi.fn((names: readonly string[]) =>
     Promise.resolve(
       Object.fromEntries(
