@@ -1,4 +1,4 @@
-import { getTypescriptVersion, getTypesNodeVersion } from '../../utils/versions.js';
+import { getTypescriptVersion } from '../../utils/versions.js';
 
 export const PNPM_WORKSPACE = `packages:
   - "apps/*"
@@ -10,13 +10,14 @@ export const PNPM_WORKSPACE = `packages:
 // between plain tsc --watch and turbo's node --watch invocation.
 export function generateMonorepoPackageFiles(
   devScript: string,
+  typesNodeVersion: string,
 ): Array<{ content: string; path: string }> {
   return [
     // Solution-style root: init sees the references and typechecks with
     // tsc -b, which builds each package against its own tsconfig.
     { content: rootTsconfig(), path: 'tsconfig.json' },
     {
-      content: monorepoPkgJson('@repo/web', devScript, {
+      content: monorepoPkgJson('@repo/web', devScript, typesNodeVersion, {
         '@repo/config': 'workspace:*',
         '@repo/shared': 'workspace:*',
       }),
@@ -33,7 +34,7 @@ export function generateMonorepoPackageFiles(
     },
 
     {
-      content: monorepoPkgJson('@repo/mobile', devScript, {
+      content: monorepoPkgJson('@repo/mobile', devScript, typesNodeVersion, {
         '@repo/config': 'workspace:*',
         '@repo/shared': 'workspace:*',
       }),
@@ -50,7 +51,7 @@ export function generateMonorepoPackageFiles(
     },
 
     {
-      content: monorepoPkgJson('@repo/api', devScript, {
+      content: monorepoPkgJson('@repo/api', devScript, typesNodeVersion, {
         '@repo/config': 'workspace:*',
         '@repo/db': 'workspace:*',
         '@repo/shared': 'workspace:*',
@@ -71,7 +72,10 @@ export function generateMonorepoPackageFiles(
       path: 'apps/api/src/index.ts',
     },
 
-    { content: monorepoPkgJson('@repo/shared', devScript), path: 'packages/shared/package.json' },
+    {
+      content: monorepoPkgJson('@repo/shared', devScript, typesNodeVersion),
+      path: 'packages/shared/package.json',
+    },
     { content: monorepoTsconfig(), path: 'packages/shared/tsconfig.json' },
     {
       content:
@@ -79,7 +83,10 @@ export function generateMonorepoPackageFiles(
       path: 'packages/shared/src/index.ts',
     },
 
-    { content: monorepoPkgJson('@repo/config', devScript), path: 'packages/config/package.json' },
+    {
+      content: monorepoPkgJson('@repo/config', devScript, typesNodeVersion),
+      path: 'packages/config/package.json',
+    },
     { content: monorepoTsconfig(), path: 'packages/config/tsconfig.json' },
     {
       content:
@@ -88,7 +95,9 @@ export function generateMonorepoPackageFiles(
     },
 
     {
-      content: monorepoPkgJson('@repo/db', devScript, { '@repo/config': 'workspace:*' }),
+      content: monorepoPkgJson('@repo/db', devScript, typesNodeVersion, {
+        '@repo/config': 'workspace:*',
+      }),
       path: 'packages/db/package.json',
     },
     { content: monorepoTsconfig(['../../packages/config']), path: 'packages/db/tsconfig.json' },
@@ -120,9 +129,13 @@ export function monorepoTsconfig(refs?: string[]): string {
 `;
 }
 
-function monorepoPkgJson(name: string, devScript: string, deps?: Record<string, string>): string {
+function monorepoPkgJson(
+  name: string,
+  devScript: string,
+  typesNodeVersion: string,
+  deps?: Record<string, string>,
+): string {
   const tsVersion = getTypescriptVersion();
-  const typesNodeVersion = getTypesNodeVersion();
   return (
     JSON.stringify(
       {

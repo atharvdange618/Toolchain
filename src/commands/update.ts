@@ -1,5 +1,3 @@
-import { execSync } from 'node:child_process';
-
 import { effectiveScripts, type Entry } from '../generators/entry.js';
 import { withHookWants } from '../generators/husky.js';
 import { assertPattern, type ChoiceFlags, updateCommand } from '../manifest/choices.js';
@@ -13,7 +11,9 @@ import {
   prepareWrites,
   writeManifest,
 } from '../manifest/write.js';
-import { error, info, success, warn } from '../utils/logger.js';
+import { error, info, intro, outro, warn } from '../utils/logger.js';
+import { isCommandCancelled } from '../utils/process.js';
+import { runTask, withProgress } from '../utils/progress.js';
 import { getToolchainDeps } from '../utils/versions.js';
 import { warnAboutWorkspacePackages, warnAboutWorkspaceTypes } from './init.js';
 import { chooseConflicts } from './update-prompts.js';
@@ -45,9 +45,10 @@ export async function update(options: {
         ...Object.keys(project.manifest ?? {}),
       ].map((entryPath) => entryPath.split('#')[0] ?? entryPath),
     );
+    intro('Toolchain update');
     const promptOptions = {
       yes: options.yes ?? false,
-      isTTY: process.stdin.isTTY === true,
+      isTTY: process.stdin.isTTY === true && process.stdout.isTTY === true,
       pm: project.pm,
       flags,
       used: new Set<string>(),
@@ -78,7 +79,14 @@ export async function update(options: {
     const missing = entries
       .filter((entry) => entry.path.startsWith(dependencyPrefix))
       .map((entry) => entry.path.slice(dependencyPrefix.length));
-    const versions = missing.length > 0 ? getToolchainDeps(missing) : {};
+    const versions =
+      missing.length > 0
+        ? await withProgress(
+            'Resolving missing dependency versions',
+            'Missing dependency versions resolved',
+            (signal) => getToolchainDeps(missing, signal),
+          )
+        : {};
     for (const entry of entries) {
       if (!entry.path.startsWith(dependencyPrefix)) continue;
       const name = entry.path.slice(dependencyPrefix.length);
@@ -118,13 +126,20 @@ export async function update(options: {
     for (const file of completed) info(`Updated: ${file}`);
 
     let failed = false;
+    let cancelled = false;
     if (missing.length > 0) {
       try {
-        execSync(`${project.pm} install`, { cwd: project.targetDir, stdio: 'inherit' });
-      } catch {
+        await runTask(`${project.pm} install`, {
+          cwd: project.targetDir,
+          title: `Installing dependencies with ${project.pm}`,
+          successMessage: 'Dependencies installed',
+        });
+      } catch (error_) {
         failed = true;
+        cancelled = isCommandCancelled(error_);
+        // Printed before the manifest save, so a second Ctrl+C still leaves the retry line.
         error(
-          `Failed to install dependencies. Run "${project.pm} install" manually. A rerun of update will not retry install automatically because the dependencies are now declared.`,
+          `${cancelled ? 'Install cancelled' : 'Failed to install dependencies'}. Run "${project.pm} install" manually. A rerun of update will not retry install automatically because the dependencies are now declared.`,
         );
       }
     }
@@ -136,7 +151,7 @@ export async function update(options: {
         `${error_ instanceof Error ? error_.message : String(error_)}. Could not save .toolchain.json; rerun update to record the applied content.`,
       );
     }
-    if (failed) return 1;
+    if (failed) return cancelled ? 130 : 1;
 
     const unresolvedPaths: string[] = [];
     for (const { row, action } of decisions) {
@@ -151,9 +166,10 @@ export async function update(options: {
     if (unresolvedPaths.length > 0) info(`Next: ${updateCommand(project.pm, unresolvedPaths)}`);
     warnAboutWorkspaceTypes(project.info.unresolvedWorkspaceTypes);
     if (project.info.isMonorepo) warnAboutWorkspacePackages(project.targetDir, 'update');
-    success('Toolchain update complete.');
+    outro('Toolchain update complete.');
     return 0;
   } catch (error_) {
+    if (isCommandCancelled(error_)) return 130;
     error(error_ instanceof Error ? error_.message : String(error_));
     return 1;
   }

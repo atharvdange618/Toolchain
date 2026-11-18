@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { PackageManager, ProjectInfo } from '../detectors/project.js';
 
 import { readJson } from '../utils/fs.js';
-import { getToolchainDeps } from '../utils/versions.js';
 import { effectiveScripts, type Entry, type Plan, type PlanMessage } from './entry.js';
 import { generateHuskyHooks } from './husky.js';
 import { generateOxlintConfig } from './oxlint.js';
@@ -19,12 +18,12 @@ import {
 import { generateTsconfig } from './tsconfig.js';
 
 // Everything init would write, read from the project but written nowhere.
-// The version lookup runs here, so a failed one leaves the project untouched.
+// Callers resolve versions before planning; this module performs no network work.
 export function buildPlan(
   targetDir: string,
   info: ProjectInfo,
   pm: PackageManager,
-  deps?: Record<string, string>,
+  deps: Record<string, string>,
   pkg: Record<string, unknown> = readJson(path.join(targetDir, 'package.json')),
 ): Plan {
   const entries: Entry[] = [
@@ -64,7 +63,7 @@ export function buildPlan(
     entries.push({ path: 'tsconfig.json', want: generateTsconfig() });
   }
 
-  const packagePlan = planPackageJson(pkg, info, deps ?? getToolchainDeps());
+  const packagePlan = planPackageJson(pkg, info, deps);
   entries.push(...packagePlan.entries);
   messages.push(...packagePlan.messages);
 

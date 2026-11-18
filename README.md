@@ -19,6 +19,8 @@ npx @atharvdange/toolchain init
 
 Use `pnpm dlx`, `yarn dlx` (Yarn 2+) or `bunx` in place of `npx` to match your package manager. The examples below use `pnpm dlx`.
 
+Requires Node.js 20.12 or later.
+
 ## What it supports
 
 | Project                                      | Status    |
@@ -81,7 +83,7 @@ pnpm dlx @atharvdange/toolchain scaffold my-app --template nextjs --pm pnpm
 | `pnpm-monorepo` | pnpm workspaces with `apps/` and `packages/` | toolchain         |
 | `turbo`         | Turborepo with `apps/` and `packages/`       | toolchain         |
 
-Leave out `--template` to choose from a list. The monorepo templates require pnpm and override `--pm`. With `--yes`, `create-vite` and `create-next-app` run without prompts on their TypeScript defaults.
+Leave out `--template` to choose from a list. The monorepo templates require pnpm and override `--pm`. `create-vite` never prompts, since the template is already chosen. `create-next-app` asks its own questions unless you pass `--yes`, which pins TypeScript and the App Router.
 
 ## What it sets up
 

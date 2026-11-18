@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
 
+import { getVersions } from '../../utils/versions.js';
 import { generateMonorepoPackageFiles, PNPM_WORKSPACE } from './monorepo-shared.js';
 
 const GITIGNORE = `node_modules/
@@ -10,11 +11,14 @@ dist/
 .env.local
 `;
 
-export function generatePnpmMonorepo(ctx: TemplateContext): TemplateResult {
+export async function generatePnpmMonorepo(ctx: TemplateContext): Promise<TemplateResult> {
+  const versions = await getVersions(['@types/node'], ctx.signal);
+  const typesNodeVersion = versions['@types/node'];
+  if (!typesNodeVersion) throw new Error('Could not resolve @types/node');
   return {
     files: [
       { content: PNPM_WORKSPACE, path: 'pnpm-workspace.yaml' },
-      ...generateMonorepoPackageFiles('tsc --watch'),
+      ...generateMonorepoPackageFiles('tsc --watch', typesNodeVersion),
       { content: GITIGNORE, path: '.gitignore' },
     ],
     framework: 'plain',

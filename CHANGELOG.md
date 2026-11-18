@@ -4,6 +4,11 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 ## [Unreleased]
 
+### Changed
+
+- The CLI requires Node.js 20.12.0 or later. Clack handles interactive prompts and groups setup output. Install, registry lookup, and scaffold steps show progress in a terminal and stream plain output when redirected.
+- Cancelling an interactive prompt or running task exits 130. `init` requires `--yes` without a terminal, and `scaffold` requires `--template` there. The Next.js scaffold runs the create-next-app prompts when you omit `--yes`.
+
 ### Removed
 
 - The interactive commit prompt: the `commit` script, `config.commitizen`, and the `commitizen` and `@commitlint/cz-commitlint` devDependencies. Every `commitizen` release pins `glob@7.2.3`, so each npm install printed deprecation warnings for `glob` and `inflight` (#10). The `commit-msg` hook still enforces the format. `update` removes the script and config when unedited; see [Upgrading](docs/upgrading.md#from-22) to remove the packages.

@@ -23,6 +23,8 @@ export const TEMPLATE_DESCRIPTIONS: Record<TemplateType, string> = {
 export interface TemplateContext {
   packageManager: PackageManager;
   projectName: string;
+  // Cancels registry lookups when the user presses Ctrl+C.
+  signal?: AbortSignal;
   targetDir: string;
   yes: boolean;
 }
@@ -34,5 +36,5 @@ export interface TemplateResult {
   isMonorepo: boolean;
   packageJson: Record<string, unknown>;
 
-  scaffold?: (ctx: TemplateContext) => void;
+  scaffold?: (ctx: TemplateContext) => Promise<void>;
 }

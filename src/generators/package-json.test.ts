@@ -5,17 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectInfo } from '../detectors/project.js';
 
-vi.mock('../utils/versions.js', () => ({
-  getToolchainDeps: vi.fn(() => ({ oxlint: '^1.0.0', prettier: '^3.0.0' })),
-}));
-
 vi.mock('../utils/logger.js', () => ({
   warn: vi.fn(),
 }));
 
 const { planPackageJson } = await import('./package-json.js');
 const { applyEntries } = await import('./entry.js');
-const { getToolchainDeps } = await import('../utils/versions.js');
 const { warn } = await import('../utils/logger.js');
 
 // planPackageJson writes nothing, so apply its plan the way init does and
@@ -25,7 +20,10 @@ function updatePackageJson(targetDir: string, info: ProjectInfo): void {
     string,
     unknown
   >;
-  const { entries, messages } = planPackageJson(pkg, info, getToolchainDeps());
+  const { entries, messages } = planPackageJson(pkg, info, {
+    oxlint: '^1.0.0',
+    prettier: '^3.0.0',
+  });
   applyEntries(targetDir, entries);
   for (const message of messages) warn(message.text);
 }

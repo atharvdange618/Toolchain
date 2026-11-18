@@ -46,7 +46,9 @@ src/
 │   └── write.ts                # Prepared mutations, backups and atomic writes
 └── utils/
     ├── fs.ts                   # readJson, writeFile (creates parent dirs), shared read helpers
-    ├── logger.ts               # Colored output with picocolors
+    ├── logger.ts               # Clack terminal messages and static output for scripts
+    ├── process.ts              # Async commands, signal handling and bounded capture
+    ├── progress.ts             # Terminal progress and task logs
     └── versions.ts             # Resolves dependency versions from the npm registry
 scripts/
 └── smoke.sh                    # Packs the CLI and scaffolds every template from the tarball
@@ -56,11 +58,11 @@ scripts/
 
 ### `src/index.ts`
 
-Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--pm`, `--yes`), `doctor` (`--pm`) and `update` (`--yes`, `--pm`). Doctor and update return codes set `process.exitCode`. Reads the version from `package.json` at runtime. Uses `parseAsync`, so a rejected action prints one line instead of a stack trace.
+Registers `init` (`--yes`, `--pm`), `scaffold <project-name>` (`--template`, `--pm`, `--yes`), `doctor` (`--pm`) and `update` (`--yes`, `--pm`). Doctor and update return codes set `process.exitCode`. Reads the version from `package.json` at runtime. Uses `parseAsync` to report rejected actions. A cancellation exits 130.
 
 ### `src/commands/init.ts`
 
-Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; `buildPlan` resolves dependency versions before anything is written, so a failed lookup leaves the project untouched.
+Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prompt, await dependency versions with progress, `buildPlan`, print the plan's messages, move other configs aside, `applyEntries`, record `.toolchain.json`, install, `husky`. No generator writes to disk; init finishes version lookups before planning or writing, so a failed or cancelled lookup leaves the project untouched.
 
 - Refuses Vue, Nuxt, Svelte, SvelteKit, Astro and Angular before writing anything (`refuseUnsupported`), because those checkers embed the TS compiler API that TypeScript 7 does not ship, so the generated `typecheck` would pass while checking no component files.
 - Warns, but still writes, when the project has no `.ts`/`.tsx`/`.mts`/`.cts` file: the config ignores `.js` and `lint-staged` matches `.ts`, so a green run would check nothing. Expo is exempt.
@@ -74,7 +76,7 @@ Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prom
 
 ### `src/commands/scaffold.ts`
 
-Validates the name and template, picks the package manager (`pnpm-monorepo` and `turbo` require pnpm), and runs the template's generator. `react` and `nextjs` call `create-vite` and `create-next-app` through `pmDlx()`; the rest write files directly. Then it runs `git init` if needed, calls `init({ yes: true })`, and runs `lint:fix` and `format` so the new project passes its own checks.
+Validates the name and template, picks the package manager (`pnpm-monorepo` and `turbo` require pnpm), and runs the template's generator. `react` and `nextjs` await `create-vite` and `create-next-app` through `pmDlx()` and `runTask`; the rest write files directly. `create-vite` always gets `--no-immediate --no-interactive`, since the template is already chosen. `create-next-app` without `--yes` runs `interactive`, inheriting the terminal so its questions stay visible. Then it runs `git init` if needed, calls `init({ yes: true })`, and runs `lint:fix` and `format` so the new project passes its own checks. A failed Git, lint or format step warns and continues; a failed scaffolder stops the command, and cancellation stops it at any step with no ready message.
 
 ### `src/commands/doctor.ts` and `src/commands/update.ts`
 
@@ -84,7 +86,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 - Update decides non-hook entries first, then generates hook wants from the scripts those decisions keep or write. It finishes both prompt stages and resolves only missing required dependencies before writes. Intentional script and hook deletions stay deleted; missing required dependencies are restored. Existing ranges and dependencies the generator dropped stay untouched.
 - Interactive keep records the current generator hash; `--yes` keeps conflicts and unknown origins without a recorded choice, so doctor can still fail, and prints a `Next:` command that records them. Cancellation or a required prompt without a terminal aborts before writes.
 - `--keep`/`--overwrite` patterns (`manifest/choices.ts`) are checked by `assertPattern` before `loadProject`: `*` only after `#`, so one pattern reaches at most one file. Each prompt stage applies `flagChoices` first, then fails on that stage's unused patterns (hook paths belong to the hook stage), then prompts or, with no terminal, throws a retry command. The retry carries every flag from the original call plus a `--keep` for each open row, so a hook-stage retry keeps first-stage overwrites. Flag checks run under `--yes` too.
-- Update backs up whole files before conflict overwrites, prepares atomic writes and preserves modes. It runs `<pm> install` only after adding required devDependencies, then saves the applied-content manifest even if install failed. A failed install exits 1 and needs the printed manual retry; rerunning update will not retry it. Update runs no separate Husky setup command, though install can run the project's existing `prepare` lifecycle.
+- Update backs up whole files before conflict overwrites, prepares atomic writes and preserves modes. It runs `<pm> install` only after adding required devDependencies, then saves the applied-content manifest even if install failed. A failed install exits 1 and a cancelled one exits 130; both need the printed manual retry, and rerunning update will not retry it. Update runs no separate Husky setup command, though install can run the project's existing `prepare` lifecycle.
 - Doctor ends with `Next: <cmd>` from `nextCommand` (`report.ts`): a `--keep` for every conflict and unknown-origin row, the bare command for any other actionable row or a missing manifest, and nothing otherwise. A `removed-locally` hook alone gets no command, since its repair line covers it.
 - A missing tracked hook fails doctor with its repair: restore it from Git or remove that path from the manifest and run update. Update does not reverse intentional hook deletions on its own.
 
@@ -117,7 +119,7 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 ### `src/generators/plan.ts`
 
-`buildPlan(targetDir, info, pm, deps?, pkg?)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once unless supplied and writes nothing. Doctor/update supply dependency placeholders and the validated package snapshot to avoid a registry lookup.
+`buildPlan(targetDir, info, pm, deps, pkg?)` returns `{ entries, messages }`: static configs, `.gitattributes` when absent, commitlint, `.oxlintrc.json`, `tsconfig.json` (or an `info` message for each skip case), the `planPackageJson` entries and warnings, then the two hooks. It reads `package.json` once unless supplied and writes nothing. Dependencies are required: init supplies resolved versions; doctor/update supply offline placeholders and the validated package snapshot. Planning performs no registry lookup.
 
 ### `src/generators/oxlint.ts`
 
@@ -152,9 +154,15 @@ Validates the name and template, picks the package manager (`pnpm-monorepo` and 
 
 Strict, ES2022, bundler resolution, `verbatimModuleSyntax`. `nodeApp` switches to NodeNext with `src` to `dist` (plain and express templates). There is no monorepo variant: `init` writes no root tsconfig in a monorepo that lacks one, and the monorepo templates write their own solution-style root config. Emits nothing TypeScript 7 dropped (`baseUrl`, `moduleResolution: node`, `target: es5`).
 
+### `src/utils/process.ts` and `src/utils/progress.ts`
+
+- `runCommand` runs the CLI's own command strings in capture, stream, or inherited-terminal mode. It caps captured stdout at 1 MiB and shares signal listeners across running commands. Pass user directory paths as `cwd`.
+- `withProgress` wraps registry lookups. `runTask` streams output off a terminal and shows compact Clack output on a terminal, with the full log path on failures or when it truncates diagnostics. Interactive tasks inherit the terminal.
+- `@clack/prompts` is pinned because the spinner needs a workaround for raw stdin on Windows. Verify Ctrl+C in a real Windows terminal when bumping it.
+
 ### `src/utils/versions.ts`
 
-Asks npm for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. TypeScript is fixed at `^7.0.2`. `TOOLCHAIN_DEP_NAMES` supports offline planning; `getToolchainDeps(names?)` resolves only the selected missing packages for update, or all packages for init.
+Asks npm asynchronously for the newest stable release at least a day old (`pickSettledVersion`), so pnpm 11's default `minimumReleaseAge` doesn't add exclude lines. Registry metadata is validated before use, and only successful results are cached. `getVersions(names, signal?)` runs lookups concurrently through `runCommand` in capture mode; a failed batch aborts and awaits its remaining children before rejecting. Cancellation stays typed rather than becoming a network error. TypeScript remains synchronous and fixed at `^7.0.2`. `TOOLCHAIN_DEP_NAMES` supports offline planning; `getToolchainDeps(names?, signal?)` resolves only the selected missing packages for update, or all packages for init. Express and monorepo template factories await their registry versions; shared monorepo file generation stays synchronous with one supplied Node types range.
 
 ## Key Design Decisions
 
@@ -187,7 +195,7 @@ This repo uses its own toolchain. `.oxlintrc.json`, `.husky/pre-commit` and `.hu
 
 The repo's `.toolchain.json` was adopted through the built update command after comparing generator bytes. Keep it with generator changes and check doctor afterward. Smoke runs doctor with an explicit per-case package manager after lint/typecheck/format/build, recording `logs/doctor.log`; the explicit manager prevents the parent pnpm environment from selecting hooks for an npm case.
 
-CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
+CI is `.github/workflows/ci.yml`: lint, typecheck, test and build on Node 20 and 22 for every push to `main` and every PR. Its `node-floor` job builds on 22, then installs the packed CLI with `--engine-strict` on exactly Node 20.12.0 and runs `doctor` and `init` there, since the test job's Node 20 is the newest 20.x and Vitest and pnpm aren't checked at the floor. `.github/workflows/smoke.yml` runs `pnpm run smoke` on pnpm 11 and 12 weekly and on demand, because `versions.ts` installs each dependency's latest release, so a new major can break users with no change here.
 
 Entry point: `bin/index.js` imports `dist/index.js`, built from `src/index.ts`.
 

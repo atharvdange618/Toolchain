@@ -44,15 +44,14 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@clack/prompts": "1.9.0",
     "commander": "^13.1.0",
-    "picocolors": "^1.1.1",
-    "prompts": "^2.4.2"
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@types/node": "^22.15.3",
-    "@types/prompts": "^2.4.9",
     "@types/semver": "^7.8.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
@@ -64,7 +63,7 @@
     "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.12.0"
   },
   "packageManager": "pnpm@11.20.0",
   "publishConfig": {

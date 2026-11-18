@@ -9,6 +9,7 @@ import { scaffold } from './commands/scaffold.js';
 import { update } from './commands/update.js';
 import { TEMPLATES } from './generators/templates/index.js';
 import { error } from './utils/logger.js';
+import { isCommandCancelled } from './utils/process.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,6 +84,10 @@ program
 try {
   await program.parseAsync();
 } catch (error_) {
-  error(error_ instanceof Error ? error_.message : String(error_));
-  process.exit(1);
+  // Cancellation paths print their own status. 130 matches Node's Ctrl+C exit.
+  if (isCommandCancelled(error_)) process.exit(130);
+  else {
+    error(error_ instanceof Error ? error_.message : String(error_));
+    process.exit(1);
+  }
 }

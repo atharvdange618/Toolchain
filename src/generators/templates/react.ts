@@ -1,9 +1,9 @@
-import { execSync } from 'node:child_process';
 import path from 'node:path';
 
 import type { TemplateContext, TemplateResult } from './index.js';
 
 import { pmDlx } from '../../detectors/project.js';
+import { runTask } from '../../utils/progress.js';
 
 export function generateReact(_ctx: TemplateContext): TemplateResult {
   return {
@@ -16,21 +16,19 @@ export function generateReact(_ctx: TemplateContext): TemplateResult {
   };
 }
 
-function scaffoldReact(ctx: TemplateContext): void {
-  const { packageManager: pm, projectName, targetDir, yes } = ctx;
+async function scaffoldReact(ctx: TemplateContext): Promise<void> {
+  const { packageManager: pm, projectName, targetDir } = ctx;
 
-  // --no-immediate always: otherwise create-vite may install and start a dev
-  // server that never exits, so init would never run. In a TTY it prompts
-  // unless told --no-interactive.
-  const flags = yes ? ' --no-interactive' : '';
-
-  // create-vite creates the directory itself, so run from parent
-  const parentDir = path.dirname(targetDir);
-  execSync(
-    `${pmDlx(pm)} create-vite@latest ${projectName} --template react-ts --no-immediate${flags}`,
+  // The template is already chosen, so create-vite has nothing to ask:
+  // --no-interactive always. --no-immediate stops it installing and starting
+  // a dev server that never exits, which would block init.
+  // create-vite creates the directory itself, so run from the parent.
+  await runTask(
+    `${pmDlx(pm)} create-vite@latest ${projectName} --template react-ts --no-immediate --no-interactive`,
     {
-      cwd: parentDir,
-      stdio: 'inherit',
+      cwd: path.dirname(targetDir),
+      title: 'Creating the React app with create-vite',
+      successMessage: 'Project files created by create-vite',
     },
   );
 }

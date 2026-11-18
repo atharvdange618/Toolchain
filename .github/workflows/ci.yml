@@ -10,12 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # vitest 4 requires Node ^20 || ^22 || >=24 and won't run at all on
-        # Node 18, so 18 can't be a matrix leg here even though engines.node
-        # in package.json says >=18 - that floor describes the published
-        # CLI's runtime deps (commander, picocolors, prompts), none
-        # of which need anything past Node 18, but CI can't verify that
-        # claim without a Node 18 runner to actually execute against.
+        # Clack requires Node >=20.12.0; test the supported Node 20 and 22 lines.
         node-version: [20, 22]
     steps:
       - uses: actions/checkout@v7
@@ -39,3 +34,49 @@ jobs:
       - run: pnpm run test
 
       - run: pnpm run build
+
+  # package.json promises Node >=20.12.0, but the test job runs the newest
+  # Node 20. Vitest and pnpm aren't checked at the floor, so build on 22 and run
+  # the packed CLI itself on exactly 20.12.0.
+  node-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@22
+          cache: true
+          install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build && pnpm pack --out "$RUNNER_TEMP/toolchain.tgz"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20.12.0
+
+      # --engine-strict fails if a runtime dependency needs a newer Node.
+      - name: Install the packed CLI on Node 20.12.0
+        run: |
+          node --version
+          npm install --engine-strict --prefix "$RUNNER_TEMP/cli" "$RUNNER_TEMP/toolchain.tgz"
+          echo "$RUNNER_TEMP/cli/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - run: toolchain --version
+
+      - name: doctor on this repo, text and JSON
+        run: |
+          toolchain doctor --pm pnpm
+          toolchain doctor --pm pnpm --json | node -e "JSON.parse(require('fs').readFileSync(0, 'utf8'))"
+
+      # Exercises registry lookups, the install and Husky tasks, and the manifest.
+      - name: init a fresh npm project
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir floor && cd floor
+          git init -q && npm init -y > /dev/null
+          mkdir src && echo 'export const answer = 42;' > src/index.ts
+          toolchain init --yes --pm npm
+          toolchain doctor --pm npm

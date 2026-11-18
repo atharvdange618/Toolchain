@@ -1,6 +1,6 @@
 import type { TemplateContext, TemplateResult } from './index.js';
 
-import { getTurboVersion } from '../../utils/versions.js';
+import { getVersions } from '../../utils/versions.js';
 import { generateMonorepoPackageFiles, PNPM_WORKSPACE } from './monorepo-shared.js';
 
 const GITIGNORE = `node_modules/
@@ -12,14 +12,16 @@ dist/
 .turbo/
 `;
 
-export function generateTurbo(ctx: TemplateContext): TemplateResult {
-  const turboVersion = getTurboVersion();
+export async function generateTurbo(ctx: TemplateContext): Promise<TemplateResult> {
+  const versions = await getVersions(['turbo', '@types/node'], ctx.signal);
+  const typesNodeVersion = versions['@types/node'];
+  if (!typesNodeVersion) throw new Error('Could not resolve @types/node');
 
   return {
     files: [
       { content: PNPM_WORKSPACE, path: 'pnpm-workspace.yaml' },
       { content: turboJson(), path: 'turbo.json' },
-      ...generateMonorepoPackageFiles('node --watch src/index.ts'),
+      ...generateMonorepoPackageFiles('node --watch src/index.ts', typesNodeVersion),
       { content: GITIGNORE, path: '.gitignore' },
     ],
     framework: 'plain',
@@ -27,7 +29,7 @@ export function generateTurbo(ctx: TemplateContext): TemplateResult {
     isMonorepo: true,
     packageJson: {
       devDependencies: {
-        turbo: turboVersion,
+        turbo: versions['turbo'],
       },
       name: ctx.projectName,
       packageManager: 'pnpm@9.0.0',

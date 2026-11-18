@@ -1,13 +1,13 @@
-import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import prompts from 'prompts';
+import { isCancel, select } from '@clack/prompts';
 
-import { type PackageManager, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
+import { type PackageManager, pmDlx, VALID_PACKAGE_MANAGERS } from '../detectors/project.js';
 import { generateExpress } from '../generators/templates/express.js';
 import {
   TEMPLATE_DESCRIPTIONS,
   type TemplateContext,
+  type TemplateResult,
   TEMPLATES,
   type TemplateType,
 } from '../generators/templates/index.js';
@@ -17,18 +17,22 @@ import { generatePnpmMonorepo } from '../generators/templates/pnpm-monorepo.js';
 import { generateReact } from '../generators/templates/react.js';
 import { generateTurbo } from '../generators/templates/turbo.js';
 import { writeFile } from '../utils/fs.js';
-import { error, info, step, success, warn } from '../utils/logger.js';
+import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
+import { CommandCancelledError, isCommandCancelled } from '../utils/process.js';
+import { runTask, withProgress } from '../utils/progress.js';
 import { init } from './init.js';
 
-const GENERATORS: Record<TemplateType, (ctx: TemplateContext) => ReturnType<typeof generatePlain>> =
-  {
-    express: generateExpress,
-    nextjs: generateNextjs,
-    plain: generatePlain,
-    'pnpm-monorepo': generatePnpmMonorepo,
-    react: generateReact,
-    turbo: generateTurbo,
-  };
+const GENERATORS: Record<
+  TemplateType,
+  (ctx: TemplateContext) => TemplateResult | Promise<TemplateResult>
+> = {
+  express: generateExpress,
+  nextjs: generateNextjs,
+  plain: generatePlain,
+  'pnpm-monorepo': generatePnpmMonorepo,
+  react: generateReact,
+  turbo: generateTurbo,
+};
 
 const NEXT_COMMAND: Record<TemplateType, string> = {
   express: 'start',
@@ -38,6 +42,9 @@ const NEXT_COMMAND: Record<TemplateType, string> = {
   react: 'dev',
   turbo: 'dev',
 };
+
+// Templates whose generator asks the registry for dependency versions.
+const RESOLVES_VERSIONS: ReadonlySet<TemplateType> = new Set(['express', 'pnpm-monorepo', 'turbo']);
 
 // Templates that require a specific package manager
 const REQUIRED_PM: Partial<Record<TemplateType, PackageManager>> = {
@@ -78,22 +85,24 @@ export async function scaffold(
     process.exit(1);
   }
 
+  intro(`Create ${projectName}`);
   if (!template && !options.yes) {
-    const response = await prompts({
-      choices: TEMPLATES.map((t) => ({
-        description: TEMPLATE_DESCRIPTIONS[t],
-        title: t,
+    if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+      throw new Error('Scaffold has no terminal to ask. Rerun with --template <type>.');
+    }
+    const selected = await select({
+      options: TEMPLATES.map((t) => ({
+        hint: TEMPLATE_DESCRIPTIONS[t],
+        label: t,
         value: t,
       })),
       message: 'Select a project template:',
-      name: 'template',
-      type: 'select',
     });
-    template = response.template as TemplateType;
-    if (!template) {
-      warn('Aborted by user.');
-      return;
+    if (isCancel(selected)) {
+      warn('Scaffold cancelled. No files were changed.');
+      throw new CommandCancelledError('Select a project template');
     }
+    template = selected;
   }
 
   if (!template) {
@@ -119,8 +128,6 @@ export async function scaffold(
     }
   }
 
-  info(`Creating ${template} project "${projectName}"...`);
-
   const ctx: TemplateContext = {
     packageManager: pm,
     projectName,
@@ -129,10 +136,17 @@ export async function scaffold(
   };
 
   const generator = GENERATORS[template];
-  let result: ReturnType<typeof generator>;
+  let result: TemplateResult;
   try {
-    result = generator(ctx);
+    result = RESOLVES_VERSIONS.has(template)
+      ? await withProgress(
+          'Resolving template versions',
+          'Template versions resolved',
+          async (signal) => generator({ ...ctx, signal }),
+        )
+      : await generator(ctx);
   } catch (error_) {
+    if (isCommandCancelled(error_)) throw error_;
     error(
       error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`,
     );
@@ -140,70 +154,94 @@ export async function scaffold(
   }
 
   if (result.scaffold) {
-    // CLI-based template (react, nextjs) - let the external tool handle project creation
-    step(1, `Running ${template} scaffolding tool...`);
-    result.scaffold(ctx);
-    success('Project files created by official tooling');
+    // CLI-based template (react, nextjs): the external tool creates the project.
+    try {
+      await result.scaffold(ctx);
+    } catch (failure) {
+      if (existsSync(targetDir)) {
+        warn(`Move "${targetDir}" aside before retrying scaffold, or choose a new project name.`);
+      } else if (isCommandCancelled(failure)) {
+        warn('Scaffold cancelled. Rerun the same command to try again.');
+      }
+      throw failure;
+    }
   } else {
     // File-based template - create directory and write files ourselves
-    step(1, 'Creating project directory...');
+    step(`Creating ${template} project files...`);
     mkdirSync(targetDir, { recursive: true });
 
-    step(2, 'Generating project files...');
     for (const file of result.files) {
       const filePath = path.join(targetDir, file.path);
       writeFile(filePath, file.content);
-      success(file.path);
     }
 
-    step(3, 'Writing package.json...');
     writeFile(
       path.join(targetDir, 'package.json'),
       JSON.stringify(result.packageJson, null, 2) + '\n',
     );
-    success('package.json');
+    success(`Created ${result.files.length + 1} project files`);
   }
-
-  let stepNumber = result.scaffold ? 2 : 4;
 
   // create-next-app makes a repo, create-vite doesn't. Husky needs one.
+  // Ordinary failures warn and continue; cancellation propagates, so nothing
+  // after Ctrl+C runs and no ready message prints.
   if (!existsSync(path.join(targetDir, '.git'))) {
-    step(stepNumber++, 'Initializing git repository...');
-    try {
-      execSync('git init', { cwd: targetDir, stdio: 'inherit' });
-      success('Git repository initialized');
-    } catch {
-      warn('Failed to initialize git repository. You can run "git init" manually.');
-    }
+    await warnOnFailure(
+      'git init',
+      targetDir,
+      'Initializing git repository',
+      'Git repository initialized',
+      'Failed to initialize git repository. You can run "git init" manually.',
+      `In "${targetDir}", run "git init" and then "${pmDlx(pm)} @atharvdange/toolchain init --yes --pm ${pm}".`,
+    );
   }
 
-  step(stepNumber++, 'Setting up toolchain...');
-  await init({ pm, targetDir, yes: true });
+  await init({ pm, targetDir, yes: true, nested: true });
 
   // Generated code (ours, create-vite's, create-next-app's) doesn't follow the
   // rules init just set up, so a new project would fail its own checks.
-  step(stepNumber, 'Fixing lint and formatting generated files...');
-  try {
-    execSync(`${pm} run lint:fix`, { cwd: targetDir, stdio: 'inherit' });
-  } catch {
-    warn(`Some lint errors need a manual fix. Run "${pm} run lint" to see them.`);
-  }
-  try {
-    execSync(`${pm} run format`, { cwd: targetDir, stdio: 'inherit' });
-    success('Generated files formatted');
-  } catch {
-    warn(`Formatting failed. Run "${pm} run format" manually.`);
-  }
+  await warnOnFailure(
+    `${pm} run lint:fix`,
+    targetDir,
+    'Fixing lint in generated files',
+    'Lint fixes applied',
+    `Some lint errors need a manual fix. Run "${pm} run lint" to see them.`,
+    `Run "${pm} run lint:fix" and "${pm} run format" manually to finish setup.`,
+  );
+  await warnOnFailure(
+    `${pm} run format`,
+    targetDir,
+    'Formatting generated files',
+    'Generated files formatted',
+    `Formatting failed. Run "${pm} run format" manually.`,
+    `Run "${pm} run format" manually to finish setup.`,
+  );
 
   const nextCmd = NEXT_COMMAND[template];
-  console.log(`\n${'='.repeat(50)}`);
-  success(`Project "${projectName}" is ready!`);
-  console.log(`\nNext steps:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`  ${pm} run ${nextCmd}`);
-  console.log(
-    `\nNote: If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`,
+  info(
+    `If you re-initialize git (git init) after setup, run "${pm} run prepare" to restore hooks.`,
   );
+  note(`cd ${projectName}\n${pm} run ${nextCmd}`, 'Next steps');
+  outro(`Project "${projectName}" is ready!`);
+}
+
+async function warnOnFailure(
+  command: string,
+  cwd: string,
+  title: string,
+  successMessage: string,
+  failure: string,
+  cancelRetry: string,
+): Promise<void> {
+  try {
+    await runTask(command, { cwd, title, successMessage });
+  } catch (error_) {
+    if (isCommandCancelled(error_)) {
+      warn(cancelRetry);
+      throw error_;
+    }
+    warn(failure);
+  }
 }
 
 function isValidProjectName(name: string): boolean {

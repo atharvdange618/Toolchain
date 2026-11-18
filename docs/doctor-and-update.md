@@ -58,8 +58,14 @@ Deleted scripts and hooks stay deleted. A deleted required hook still fails `doc
 
 `update` resolves only missing required packages before writes and runs `<pm> install` only after adding their declarations. It does not move configs aside or run a separate Husky setup command. That install can run an existing `prepare` lifecycle script, including `husky`. Conflict overwrites get a full-file backup (`.bak`, then `.bak.1`, and so on); existing backups survive. There is no cross-file rollback or support for concurrent writers.
 
-If install fails, `update` still saves the manifest for the applied content, exits 1 and prints the manual retry command, such as `pnpm install`. Run that command yourself: another `update` sees the declarations and will not retry install. A green `doctor` does not prove install succeeded.
+If install fails or you cancel it, `update` still saves the manifest for the applied content and prints the manual retry command, such as `pnpm install`. Run that command to finish installing. A rerun of `update` sees the declarations and skips install. A green `doctor` checks the declarations and hook sources.
 
 If a content write fails, `update` retains the old manifest and runs no install. When new dependency declarations were already written, it prints the selected manager's manual install command. Run that command yourself too: rerunning `update` will not install those declared dependencies.
+
+### Exit codes
+
+- **0** when update completes, including when `--yes` keeps conflicts without recording a choice.
+- **1** when update fails, including an install failure.
+- **130** when you cancel an update prompt, registry lookup, or install.
 
 Both commands accept `--pm bun|npm|pnpm|yarn`; otherwise they use the [detection order](configuration.md#detection-logic).
