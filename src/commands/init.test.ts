@@ -320,6 +320,96 @@ describe('init package manager', () => {
   });
 });
 
+// #11: npm resolves the old lockfile's ESLint tree against TypeScript 7 before
+// pruning it, and prints ERESOLVE for every typescript-eslint package.
+describe('init removing ESLint packages', () => {
+  function writeProject(lockfile: boolean): void {
+    writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({
+        devDependencies: { eslint: '^9', 'eslint-config-next': '16.0.0', typescript: '^5' },
+        name: 'demo',
+      }),
+    );
+    if (lockfile) writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+  }
+
+  function devDependencies(): Record<string, string> {
+    const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
+      devDependencies: Record<string, string>;
+    };
+    return pkg.devDependencies;
+  }
+
+  function commands(): string[] {
+    return vi.mocked(runTask).mock.calls.map(([command]) => command);
+  }
+
+  it('uninstalls them with npm before package.json moves to TypeScript 7', async () => {
+    writeProject(true);
+    let typescriptDuringUninstall: string | undefined;
+    vi.mocked(runTask).mockImplementationOnce(() => {
+      typescriptDuringUninstall = devDependencies()['typescript'];
+      return Promise.resolve();
+    });
+
+    await init({ pm: 'npm', targetDir: dir, yes: true });
+
+    expect(commands()).toEqual([
+      'npm uninstall eslint eslint-config-next',
+      'npm install',
+      'npm exec -- husky',
+    ]);
+    expect(typescriptDuringUninstall).toBe('^5');
+    expect(devDependencies()).not.toHaveProperty('eslint');
+    expect(devDependencies()['typescript']).toBe('^7.0.2');
+  });
+
+  it('skips the uninstall without a lockfile, where it would install everything twice', async () => {
+    writeProject(false);
+
+    await init({ pm: 'npm', targetDir: dir, yes: true });
+
+    expect(commands()).toEqual(['npm install', 'npm exec -- husky']);
+  });
+
+  it('skips the uninstall for other package managers', async () => {
+    writeProject(true);
+
+    await init({ pm: 'pnpm', targetDir: dir, yes: true });
+
+    expect(commands()).toEqual(['pnpm install', 'pnpm exec husky']);
+  });
+
+  it('warns and still installs when the uninstall fails', async () => {
+    writeProject(true);
+    vi.mocked(runTask).mockRejectedValueOnce(new Error('network down'));
+    const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+
+    await init({ pm: 'npm', targetDir: dir, yes: true });
+
+    expect(commands()).toContain('npm install');
+    expect(devDependencies()['typescript']).toBe('^7.0.2');
+    expect(stdout.mock.calls.flat().join('')).toContain(
+      'npm uninstall eslint eslint-config-next failed',
+    );
+  });
+
+  it('stops before writing anything when the uninstall is cancelled', async () => {
+    writeProject(true);
+    const failure = new CommandCancelledError('npm uninstall eslint eslint-config-next');
+    vi.mocked(runTask).mockRejectedValueOnce(failure);
+    const log = vi.spyOn(process.stdout, 'write');
+
+    await expect(init({ pm: 'npm', targetDir: dir, yes: true })).rejects.toBe(failure);
+
+    expect(commands()).toEqual(['npm uninstall eslint eslint-config-next']);
+    expect(existsSync(path.join(dir, '.editorconfig'))).toBe(false);
+    expect(existsSync(path.join(dir, '.toolchain.json'))).toBe(false);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Rerun init'));
+  });
+});
+
 describe('init with an existing project setup', () => {
   it('moves shadowing eslint.config.js, eslint.config.mjs and legacy .eslintrc aside, keeping their contents', async () => {
     writeFileSync(path.join(dir, 'eslint.config.js'), 'export default [];\n');
