@@ -137,8 +137,10 @@ export async function init(options: {
   // project as it was.
   let plan: Plan;
   try {
-    const deps = await withProgress('Resolving toolchain versions', (signal) =>
-      getToolchainDeps(undefined, signal),
+    const deps = await withProgress(
+      'Resolving toolchain versions',
+      'Toolchain versions resolved',
+      (signal) => getToolchainDeps(undefined, signal),
     );
     plan = buildPlan(targetDir, projectInfo, pm, deps);
   } catch (error_) {

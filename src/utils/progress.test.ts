@@ -77,7 +77,7 @@ function logPath(): string {
 describe('withProgress', () => {
   it('animates a real wait, returns the result and removes signal listeners', async () => {
     const count = process.listenerCount('SIGINT');
-    const result = await withProgress('Resolving', async () => {
+    const result = await withProgress('Resolving', 'Resolving done', async () => {
       await delay(250);
       return 42;
     });
@@ -90,7 +90,7 @@ describe('withProgress', () => {
     const failure = new Error('lookup failed');
     const count = process.listenerCount('SIGINT');
     await expect(
-      withProgress('Resolving', () => {
+      withProgress('Resolving', 'Resolving done', () => {
         if (kind === 'throw') throw failure;
         return Promise.reject(failure);
       }),
@@ -102,7 +102,7 @@ describe('withProgress', () => {
   it('passes cancellation to work and rejects without a later success', async () => {
     const count = process.listenerCount('SIGINT');
     await expect(
-      withProgress('Resolving', (signal) => {
+      withProgress('Resolving', 'Resolving done', (signal) => {
         process.emit('SIGINT');
         expect(signal.aborted).toBe(true);
         return Promise.resolve('ignored cancellation');
@@ -117,7 +117,7 @@ describe('withProgress', () => {
     const timer = setTimeout(() => process.emit('SIGTERM'), 250);
     try {
       await expect(
-        withProgress('Waiting', (signal) =>
+        withProgress('Waiting', 'Waiting done', (signal) =>
           runCommand(`"${process.execPath}" wait.cjs`, {
             cwd: dir,
             mode: 'stream',
@@ -290,6 +290,14 @@ describe('runTask', () => {
 });
 
 describe('static progress', () => {
+  it('prints the title once and a separate completion line off a terminal', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: false });
+    await withProgress('Resolving versions', 'Versions resolved', () => Promise.resolve(1));
+    const text = stripVTControlCharacters(output);
+    expect(text.match(/Resolving versions/g)).toHaveLength(1);
+    expect(text).toContain('Versions resolved');
+  });
+
   it.each(['CI', 'stdout', 'stdin'])(
     'does not animate with %s and preserves stream destinations',
     async (mode) => {
@@ -299,7 +307,7 @@ describe('static progress', () => {
           configurable: true,
           value: false,
         });
-      await withProgress('Lookup', () => Promise.resolve(1));
+      await withProgress('Lookup', 'Lookup done', () => Promise.resolve(1));
       await task("console.log('out'); console.error('err');");
       expect(output).toContain('out\n');
       expect(errors).toContain('err\n');

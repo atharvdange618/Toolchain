@@ -81,8 +81,10 @@ export async function update(options: {
       .map((entry) => entry.path.slice(dependencyPrefix.length));
     const versions =
       missing.length > 0
-        ? await withProgress('Resolving missing dependency versions', (signal) =>
-            getToolchainDeps(missing, signal),
+        ? await withProgress(
+            'Resolving missing dependency versions',
+            'Missing dependency versions resolved',
+            (signal) => getToolchainDeps(missing, signal),
           )
         : {};
     for (const entry of entries) {

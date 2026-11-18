@@ -28,6 +28,7 @@ function terminalProgress(): boolean {
 
 export async function withProgress<T>(
   title: string,
+  successMessage: string,
   work: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   const controller = new AbortController();
@@ -42,8 +43,8 @@ export async function withProgress<T>(
     else step(title);
     const value = await work(controller.signal);
     if (controller.signal.aborted) throw new CommandCancelledError(title);
-    if (spinner) spinner.stop(title);
-    else success(title);
+    if (spinner) spinner.stop(successMessage);
+    else success(successMessage);
     return value;
   } catch (failure) {
     if (!spinner?.isCancelled) {
