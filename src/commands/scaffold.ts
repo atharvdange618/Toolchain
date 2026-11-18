@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { isCancel, select } from '@clack/prompts';
@@ -19,6 +18,8 @@ import { generateReact } from '../generators/templates/react.js';
 import { generateTurbo } from '../generators/templates/turbo.js';
 import { writeFile } from '../utils/fs.js';
 import { error, info, intro, note, outro, step, success, warn } from '../utils/logger.js';
+import { isCommandCancelled } from '../utils/process.js';
+import { runTask, withProgress } from '../utils/progress.js';
 import { init } from './init.js';
 
 const GENERATORS: Record<
@@ -41,6 +42,9 @@ const NEXT_COMMAND: Record<TemplateType, string> = {
   react: 'dev',
   turbo: 'dev',
 };
+
+// Templates whose generator asks the registry for dependency versions.
+const RESOLVES_VERSIONS: ReadonlySet<TemplateType> = new Set(['express', 'pnpm-monorepo', 'turbo']);
 
 // Templates that require a specific package manager
 const REQUIRED_PM: Partial<Record<TemplateType, PackageManager>> = {
@@ -134,8 +138,15 @@ export async function scaffold(
   const generator = GENERATORS[template];
   let result: TemplateResult;
   try {
-    result = await generator(ctx);
+    result = RESOLVES_VERSIONS.has(template)
+      ? await withProgress(
+          'Resolving template versions',
+          'Template versions resolved',
+          async (signal) => generator({ ...ctx, signal }),
+        )
+      : await generator(ctx);
   } catch (error_) {
+    if (isCommandCancelled(error_)) throw error_;
     error(
       error_ instanceof Error ? error_.message : `Failed to generate the ${template} template.`,
     );
@@ -143,10 +154,9 @@ export async function scaffold(
   }
 
   if (result.scaffold) {
-    // CLI-based template (react, nextjs) - let the external tool handle project creation
-    step(`Running ${template} scaffolding tool...`);
-    result.scaffold(ctx);
-    success('Project files created by official tooling');
+    // CLI-based template (react, nextjs): the external tool creates the project.
+    // Any failure or cancellation stops here, before git, init or cleanup.
+    await result.scaffold(ctx);
   } else {
     // File-based template - create directory and write files ourselves
     step(`Creating ${template} project files...`);
@@ -165,32 +175,38 @@ export async function scaffold(
   }
 
   // create-next-app makes a repo, create-vite doesn't. Husky needs one.
+  // Ordinary failures warn and continue; cancellation propagates, so nothing
+  // after Ctrl+C runs and no ready message prints.
   if (!existsSync(path.join(targetDir, '.git'))) {
-    step('Initializing git repository...');
-    try {
-      execSync('git init', { cwd: targetDir, stdio: 'inherit' });
-      success('Git repository initialized');
-    } catch {
-      warn('Failed to initialize git repository. You can run "git init" manually.');
-    }
+    await warnOnFailure(
+      'git init',
+      targetDir,
+      'Initializing git repository',
+      'Git repository initialized',
+      'Failed to initialize git repository. You can run "git init" manually.',
+    );
   }
 
   await init({ pm, targetDir, yes: true, nested: true });
 
   // Generated code (ours, create-vite's, create-next-app's) doesn't follow the
   // rules init just set up, so a new project would fail its own checks.
-  step('Fixing lint and formatting generated files...');
-  try {
-    execSync(`${pm} run lint:fix`, { cwd: targetDir, stdio: 'inherit' });
-  } catch {
-    warn(`Some lint errors need a manual fix. Run "${pm} run lint" to see them.`);
-  }
-  try {
-    execSync(`${pm} run format`, { cwd: targetDir, stdio: 'inherit' });
-    success('Generated files formatted');
-  } catch {
-    warn(`Formatting failed. Run "${pm} run format" manually.`);
-  }
+  await warnOnFailure(
+    `${pm} run lint:fix`,
+    targetDir,
+    'Fixing lint in generated files',
+    'Lint fixes applied',
+    `Some lint errors need a manual fix. Run "${pm} run lint" to see them.`,
+    `Run "${pm} run lint:fix" and "${pm} run format" manually to finish setup.`,
+  );
+  await warnOnFailure(
+    `${pm} run format`,
+    targetDir,
+    'Formatting generated files',
+    'Generated files formatted',
+    `Formatting failed. Run "${pm} run format" manually.`,
+    `Run "${pm} run format" manually to finish setup.`,
+  );
 
   const nextCmd = NEXT_COMMAND[template];
   info(
@@ -198,6 +214,25 @@ export async function scaffold(
   );
   note(`cd ${projectName}\n${pm} run ${nextCmd}`, 'Next steps');
   outro(`Project "${projectName}" is ready!`);
+}
+
+async function warnOnFailure(
+  command: string,
+  cwd: string,
+  title: string,
+  successMessage: string,
+  failure: string,
+  cancelRetry?: string,
+): Promise<void> {
+  try {
+    await runTask(command, { cwd, title, successMessage });
+  } catch (error_) {
+    if (isCommandCancelled(error_)) {
+      if (cancelRetry) warn(cancelRetry);
+      throw error_;
+    }
+    warn(failure);
+  }
 }
 
 function isValidProjectName(name: string): boolean {

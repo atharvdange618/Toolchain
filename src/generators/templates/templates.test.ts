@@ -25,7 +25,7 @@ vi.mock('../../utils/versions.js', () => ({
   ),
 }));
 
-const { getTypesNodeVersion, getVersions } = await import('../../utils/versions.js');
+const { getVersions } = await import('../../utils/versions.js');
 beforeEach(() => vi.clearAllMocks());
 
 const { generateExpress } = await import('./express.js');
@@ -33,7 +33,14 @@ const { generatePlain } = await import('./plain.js');
 const { generatePnpmMonorepo } = await import('./pnpm-monorepo.js');
 const { generateTurbo } = await import('./turbo.js');
 
-const ctx = { packageManager: 'pnpm' as const, projectName: 'demo', targetDir: '', yes: true };
+const signal = new AbortController().signal;
+const ctx = {
+  packageManager: 'pnpm' as const,
+  projectName: 'demo',
+  signal,
+  targetDir: '',
+  yes: true,
+};
 // TypeScript 7's exports map hides bin/, so resolve the bin from package.json.
 const tsc = path.join(
   path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')),
@@ -65,11 +72,10 @@ describe('node app templates', () => {
   it('express: ships a tsconfig that builds src/ into dist/', async () => {
     const result = await generateExpress(ctx);
     expect(result.packageJson['dependencies']).toEqual({ express: '^5.0.0' });
-    expect(getVersions).toHaveBeenCalledExactlyOnceWith([
-      'express',
-      '@types/express',
-      '@types/node',
-    ]);
+    expect(getVersions).toHaveBeenCalledExactlyOnceWith(
+      ['express', '@types/express', '@types/node'],
+      signal,
+    );
     expect(result.packageJson['devDependencies']).toEqual({
       '@types/express': '^5.0.0',
       '@types/node': '^22.0.0',
@@ -124,9 +130,9 @@ describe('monorepo templates', () => {
 
     expect(packageJson['scripts']).not.toHaveProperty('lint');
     if (_name === 'turbo') {
-      expect(getVersions).toHaveBeenCalledExactlyOnceWith(['turbo', '@types/node']);
+      expect(getVersions).toHaveBeenCalledExactlyOnceWith(['turbo', '@types/node'], signal);
       expect(packageJson['devDependencies']).toEqual({ turbo: '^2.0.0' });
-    } else expect(getTypesNodeVersion).toHaveBeenCalledTimes(1);
+    } else expect(getVersions).toHaveBeenCalledExactlyOnceWith(['@types/node'], signal);
     for (const file of files.filter((f) => f.path.endsWith('/package.json'))) {
       expect(JSON.parse(file.content)).toHaveProperty('devDependencies.@types/node', '^22.0.0');
       const pkg = JSON.parse(file.content) as { scripts: Record<string, string> };

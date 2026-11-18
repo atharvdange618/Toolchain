@@ -74,7 +74,7 @@ Flow: detect, refuse unsupported stacks, warn when nothing would be linted, prom
 
 ### `src/commands/scaffold.ts`
 
-Validates the name and template, picks the package manager (`pnpm-monorepo` and `turbo` require pnpm), and runs the template's generator. `react` and `nextjs` call `create-vite` and `create-next-app` through `pmDlx()`; the rest write files directly. Then it runs `git init` if needed, calls `init({ yes: true })`, and runs `lint:fix` and `format` so the new project passes its own checks.
+Validates the name and template, picks the package manager (`pnpm-monorepo` and `turbo` require pnpm), and runs the template's generator. `react` and `nextjs` await `create-vite` and `create-next-app` through `pmDlx()` and `runTask`; the rest write files directly. `create-vite` always gets `--no-immediate --no-interactive`, since the template is already chosen. `create-next-app` without `--yes` runs `interactive`, inheriting the terminal so its questions stay visible. Then it runs `git init` if needed, calls `init({ yes: true })`, and runs `lint:fix` and `format` so the new project passes its own checks. A failed Git, lint or format step warns and continues; a failed scaffolder stops the command, and cancellation stops it at any step with no ready message.
 
 ### `src/commands/doctor.ts` and `src/commands/update.ts`
 

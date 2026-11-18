@@ -32,7 +32,7 @@ app.listen(port, () => {
 
 export async function generateExpress(ctx: TemplateContext): Promise<TemplateResult> {
   const tsVersion = getTypescriptVersion();
-  const versions = await getVersions(['express', '@types/express', '@types/node']);
+  const versions = await getVersions(['express', '@types/express', '@types/node'], ctx.signal);
 
   return {
     files: [

@@ -13,7 +13,7 @@ dist/
 `;
 
 export async function generateTurbo(ctx: TemplateContext): Promise<TemplateResult> {
-  const versions = await getVersions(['turbo', '@types/node']);
+  const versions = await getVersions(['turbo', '@types/node'], ctx.signal);
   const typesNodeVersion = versions['@types/node'];
   if (!typesNodeVersion) throw new Error('Could not resolve @types/node');
 
