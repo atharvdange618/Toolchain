@@ -2,7 +2,7 @@
 
 Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [3.0.0] - 2026-11-21
 
 ### Changed
 
@@ -17,6 +17,10 @@ Notable changes to `@atharvdange/toolchain`. Format based on [Keep a Changelog](
 
 - `init` no longer prints `ERESOLVE overriding peer dependency` on npm for the ESLint packages it removes. With a `package-lock.json`, it runs `npm uninstall` on them before moving TypeScript to 7, so npm prunes the old typescript-eslint tree before it checks peers. A fresh `create-next-app` project went from 8 warnings to none. ([#11](https://github.com/atharvdange618/toolchain/issues/11))
 - `init` and `scaffold` failed on npm 12 with "Could not resolve the latest version ... Check your network connection", although the registry answered. npm 12 wraps `npm view --json` output in a one-element array, and the version lookup rejected arrays. It now reads the object inside, and the error names the underlying reason, so a parse failure no longer reads as a network problem. ([#15](https://github.com/atharvdange618/toolchain/issues/15))
+
+### Upgrade notes
+
+Upgrade to Node.js 20.12.0 or later before running the new CLI. `update` removes the `commit` script and `config.commitizen` if you never changed them; uninstall `commitizen` and `@commitlint/cz-commitlint` yourself. See [docs/upgrading.md](docs/upgrading.md#from-22) for both steps.
 
 ## [2.2.0] - 2026-11-17
 
