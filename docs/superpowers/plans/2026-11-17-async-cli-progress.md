@@ -1,6 +1,6 @@
 # Asynchronous CLI progress implementation plan
 
-> **For agentic workers:** Use `superpowers:executing-plans` for inline execution, or `superpowers:subagent-driven-development` if Atharv chooses delegation. Work task by task and verify each step. This document authorizes planning only; implementation waits until the session limit refreshes.
+The async CLI work merged in [PR #12](https://github.com/atharvdange618/Toolchain/pull/12) and shipped in [v3.0.0](https://github.com/atharvdange618/Toolchain/releases/tag/v3.0.0) on 2026-11-21. See [Release verification](#release-verification-2026-11-21) for the final results and smoke follow-up.
 
 **Goal:** Keep the CLI responsive during registry lookups and subprocesses, show Clack loading indicators, and shorten successful subprocess output without hiding warnings or failure diagnostics.
 
@@ -12,16 +12,13 @@
 
 **Estimate:** 6–8 hours including Windows checks and the smoke matrix (raised from 4–6 after review; Windows tree-kill and real-terminal Ctrl+C checks tend to need several attempts). The subprocess runner and cancellation checks carry most of the uncertainty.
 
-## Resume state
+## State when planning began
 
 - Workspace: `C:\Users\athar\Documents\Github\Toolchain`.
 - Branch at planning: `allmight/clack-cli`, HEAD `ec78b6e`.
 - `b3b811c` introduced Clack; `ec78b6e` grouped generated-file messages.
 - Last verified source checks: lint and typecheck passed; 609 tests passed, 2 skipped. Treat these as historical, not current verification.
-- Issue #11 lives independently on `fix/11-uninstall-eslint-first`, commit `a9fe43f`. Its `uninstallRemovedFirst` helper and four tests are absent from this branch by design. Do not cherry-pick, merge, or rewrite that work without a request.
-- A recovery stash named `Split issue 11 and Clack changes` was retained during branch separation. Do not apply it: it contains both changes together.
-- Start by checking status and branch. Continue on this feature branch if unchanged. Do not add another worktree or change branches without a reason.
-- Only this plan is being written now. Do not implement, install packages, commit, push, publish, or schedule automatic continuation during this planning session.
+- The issue #11 fix started separately on `fix/11-uninstall-eslint-first` at `a9fe43f`. It later merged through [PR #17](https://github.com/atharvdange618/Toolchain/pull/17) and shipped in v3.0.0.
 
 ## Design
 
@@ -220,11 +217,10 @@ Each item has an owning test task below:
 
 - [x] Search `src/commands`, `src/utils/versions.ts`, and template runtime files for `execSync`, `execFileSync` and `spawnSync`. No blocking runtime child calls should remain; synchronous checks confined to tests are fine.
 - [x] Run `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, formatting checks on changed files, and `pnpm run build`. Run the built doctor in text and JSON modes; parse JSON and check its exit code separately.
-- [ ] In a real Git Bash terminal on Windows, test plain and React scaffold success, interactive Next.js prompt visibility, a deliberately failing child task, redirected logs, and Ctrl+C during a delayed install. Check child/descendant exit and restored terminal cursor. The Codex sandbox terminal previously hung even for plain Node readline; use an actual working terminal for this acceptance check rather than adding speculative stdin workarounds.
-- [x] From Git Bash, run `bash scripts/smoke.sh plain:npm react:npm nextjs:npm pnpm-monorepo:pnpm turbo:pnpm`. Record each case's independent scaffold/lint/typecheck/format/build/doctor/hook results; then run the full smoke matrix before release. Do not count a missing tool/network failure as a pass.
+- [x] In Windows Git Bash, verify plain and React scaffold success, interactive Next.js prompts, a failed install, redirected output, and Ctrl+C during install. See the execution notes for the fixes and rerun results.
+- [x] Run the focused scaffold smoke cases from Git Bash with `bash scripts/smoke.sh plain:npm react:npm nextjs:npm pnpm-monorepo:pnpm turbo:pnpm`.
 - [x] Check the declared Node 20.12 floor with the packed CLI; do not assume the development test runner supports that exact minimum. Exercise Linux CI as well as Windows shell behavior when available.
 - [x] Update relevant docs and this checklist with actual results and remaining limits. Request one final whole-change review if the selected execution workflow calls for it.
-- [ ] Leave the implementation reviewable. Commit, push, open a PR or publish only when Atharv asks. The plan itself is uncommitted unless separately requested.
 
 ### Task 6 execution notes, 2026-11-18
 
@@ -235,13 +231,14 @@ Each item has an owning test task below:
 - Follow-up, same day: the four deferred minors are fixed (log-write failure reports as a failure, SIGHUP is bridged, one shared process listener per signal, `withProgress` takes a separate success message). The three orphaned version helpers are gone. CI's `node-floor` job runs the packed CLI on Node 20.12.0.
 - Real terminal, Windows Git Bash (Atharv): scaffold plain/react/express, a failing install, and redirected output passed first time. Two bugs found and fixed: Clack 1.6.0's spinner leaves stdin raw on Windows, so Ctrl+C never became SIGINT (`withProgress` now restores cooked mode); create-next-app 16 skips its questions when any `--` flag is present (interactive runs now pass none). Rerun passed: Next.js questions appear, Ctrl+C during install prints the retry line and exits 130, Ctrl+C during lint stops before format with no ready line.
 - A scaffold cancelled after init now names what is left: "Run \"<pm> run lint:fix\" and \"<pm> run format\" manually", or only format when format was the step cancelled.
-- Open: the same checks on Linux, including closing the terminal mid-install (SIGHUP). Node 20.12 floor now runs in CI (first run pending). POSIX signal tests have only run in Linux CI. Full smoke matrix must rerun on the final code before release.
+
+### Release verification, 2026-11-21
+
+- Linux terminal testing on `887d0b7` passed both install cancellation checks. Ctrl+C exited 130 and printed a retry command. Closing the terminal stopped the install process group. [Issue #14](https://github.com/atharvdange618/Toolchain/issues/14)
+- Release CI passed on `c62d569` for Node 20 and 22 and for the packed CLI on Node 20.12.0. [Release CI](https://github.com/atharvdange618/Toolchain/actions/runs/44929979650)
+- On 2026-11-23, the full scaffold smoke matrix passed on `main` at release commit `c62d569` with pnpm 11 and 12. [Smoke run](https://github.com/atharvdange618/Toolchain/actions/runs/45125870364)
 
 ## References
 
 - [Node child_process, including Windows .cmd behavior](https://nodejs.org/api/child_process.html#spawning-bat-and-cmd-files-on-windows). Check the Node 20 documentation before using an API shown only in newer docs.
 - [Clack spinner](https://bomb.sh/docs/clack/packages/prompts/#spinner) and [task-log behavior](https://bomb.sh/docs/clack/packages/prompts/#task-log). Installed 1.9.0 declarations are the authority for available APIs.
-
-## Next-session starting instruction
-
-> Read `docs/superpowers/plans/2026-11-17-async-cli-progress.md`, check the current branch/status, and implement Task 1 first. Preserve the separate issue #11 branch. Use inline execution unless I request delegation. Run its real subprocess and cancellation tests before moving on. Do not commit until I ask.
